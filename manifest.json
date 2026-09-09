@@ -1,0 +1,17 @@
+{
+  "name": "Prova Sensorial de Amostras de Rolhas",
+  "short_name": "Prova Sensorial",
+  "description": "Cork Supply Portugal — registo e decisão da prova sensorial de amostras de rolhas",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#f3ede0",
+  "theme_color": "#4a3d2e",
+  "icons": [
+    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
