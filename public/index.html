@@ -46,16 +46,16 @@ var __Html5QrcodeLibrary__;(()=>{var t={449:function(t,e,r){!function(t){"use st
 </script>
 <style>
 :root{
-  /* paleta boho / tons naturais e suaves */
-  --bg:#f3ede0;
-  --panel:#fffcf5;
-  --header-bg:#4a3d2e;
-  --header-bg2:#362c21;
-  --accent:#b8814f;
-  --accent-dark:#93632f;
-  --text:#3d3428;
-  --muted:#8a7a66;
-  --border:#e5d9c5;
+  /* paleta HARV81 Group (roxo escuro 471F3E + coral F38767, tirados do template oficial) */
+  --bg:#f5f0ef;
+  --panel:#fffdfc;
+  --header-bg:#471F3E;
+  --header-bg2:#2e1330;
+  --accent:#F38767;
+  --accent-dark:#c85b3b;
+  --text:#2c2130;
+  --muted:#8a7686;
+  --border:#e6dde2;
   --red:#a85c49;
   --red-bg:#f2e2d9;
   --yellow:#b6872f;
@@ -68,31 +68,32 @@ var __Html5QrcodeLibrary__;(()=>{var t={449:function(t,e,r){!function(t){"use st
   --blue-bg:#e6ece7;
   --orange:#bf7a48;
   --orange-bg:#f2e2cf;
-  /* cores de PRIORIDADE da grelha (Normal=azul / Prioritário=laranja / Urgente=amarelo) —
-     deliberadamente mais escuras/saturadas que o resto da paleta, para se distinguirem bem
-     do fundo creme da app (testado: contraste >=3:1 contra --bg) */
-  --prio-n:#1f5f7a;
-  --prio-n-bg:#3f88a8;
-  --prio-n-pale:#dcecf2;
-  --prio-p:#a85315;
-  --prio-p-bg:#cf6d24;
-  --prio-p-pale:#f7e3d1;
-  --prio-u:#6b5205;
-  --prio-u-bg:#d1a51f;
-  --prio-u-pale:#f7edc9;
-  /* estado "aguarda decisão do LAB" — amarelo mais intenso/berrante que o amarelo de Urgente,
-     para nunca se confundirem mesmo lado a lado (entre laranja e amarelo vivo) */
-  --status-lab:#c98a05;
-  --status-lab-bg:#f7e2a8;
+  /* cores de PRIORIDADE da grelha — já não usam azul/laranja/amarelo genéricos: são tons/sombras
+     da própria paleta HARV81 (roxo 471F3E + coral F38767), em rampa de intensidade crescente:
+     Normal = malva claro e calmo · Prioritário = coral da marca · Urgente = roxo escuro da marca
+     (o tom mais intenso/carregado). Contraste de texto verificado em cada combinação. */
+  --prio-n:#6C4C65;
+  --prio-n-bg:#B5A5B2;
+  --prio-n-pale:#E9E4E8;
+  --prio-p:#AA5E48;
+  --prio-p-bg:#F38767;
+  --prio-p-pale:#FDE9E4;
+  --prio-u:#773C49;
+  --prio-u-bg:#471F3E;
+  --prio-u-pale:#E3DDE2;
+  /* estado "aguarda decisão do LAB" — tom terracota entre o coral e o roxo da marca, para nunca se
+     confundir com o coral do Prioritário nem com o roxo do Urgente */
+  --status-lab:#AE5D57;
+  --status-lab-bg:#F5ECEB;
   --bartops:#2f4a58;
   --bartops-bg:#4c7488;
   --radius:14px;
-  --shadow:0 1px 3px rgba(59,45,25,.1), 0 1px 2px rgba(59,45,25,.07);
+  --shadow:0 1px 3px rgba(44,33,48,.1), 0 1px 2px rgba(44,33,48,.07);
   --shell-max:520px;
 }
 *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
 html,body{margin:0;height:100%;}
-body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;background:#e6ddc9;color:var(--text);}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;background:#ded2d8;color:var(--text);}
 button{font-family:inherit;cursor:pointer;}
 .hidden{display:none !important;}
 
@@ -113,8 +114,12 @@ header.topbar .brand h1{margin:2px 0 0;font-size:16.5px;font-weight:600;line-hei
 .searchbar{margin-top:12px;display:flex;gap:8px;}
 .searchbar input{flex:1;border:none;border-radius:10px;padding:11px 12px;font-size:14px;background:rgba(255,255,255,.94);}
 .searchbar button{border:none;border-radius:10px;padding:0 14px;background:var(--accent);color:#fff;font-weight:600;font-size:13px;}
+/* botão de exportar o histórico, encostado à barra de pesquisa — assim a informação sai logo,
+   sem ter de entrar em LAB e abrir o bloco de Histórico primeiro */
+.btn-hist-csv{margin-top:8px;width:100%;border:none;border-radius:10px;padding:9px 12px;background:rgba(255,255,255,.16);color:#f2efe9;font-weight:600;font-size:12.5px;}
+.btn-hist-csv:active{background:rgba(255,255,255,.28);}
 /* resultados da pesquisa de lotes já existentes (qualquer dia/estado) */
-.search-results{position:absolute;left:16px;right:16px;top:100%;margin-top:4px;background:var(--panel);border-radius:12px;box-shadow:0 6px 18px rgba(59,45,25,.25);max-height:60vh;overflow-y:auto;z-index:41;padding:6px;}
+.search-results{position:absolute;left:16px;right:16px;top:100%;margin-top:4px;background:var(--panel);border-radius:12px;box-shadow:0 6px 18px rgba(44,33,48,.25);max-height:60vh;overflow-y:auto;z-index:41;padding:6px;}
 .search-results .sr-item{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:9px 10px;border-radius:9px;cursor:pointer;color:var(--text);}
 .search-results .sr-item:hover, .search-results .sr-item:active{background:#f3ecdb;}
 .search-results .sr-num{font-weight:800;font-size:13.5px;}
@@ -165,24 +170,37 @@ main{padding:14px 14px 10px;}
 .lg-dot.lg-urgente{background:var(--prio-u);}
 .lg-dot.lg-bartops{background:var(--bartops);}
 .grade-lotes{display:grid;grid-template-columns:repeat(3,1fr);gap:9px;}
-.quad-lote{position:relative;aspect-ratio:1/1;border-radius:11px;display:flex;align-items:center;justify-content:center;text-align:center;font-weight:800;font-size:12.5px;padding:6px;line-height:1.15;word-break:break-all;transition:transform .12s ease;}
+.quad-lote{position:relative;aspect-ratio:1/1;border-radius:11px;display:flex;align-items:center;justify-content:center;text-align:center;font-weight:800;font-size:12.5px;padding:6px 6px 18px;line-height:1.15;word-break:break-all;transition:transform .12s ease;}
 .quad-lote:hover{transform:translateY(-1px);}
 .quad-lote:active{transform:scale(.95);}
-.quad-lote.q-prio-normal{background:var(--prio-n-bg);color:#fff;border:2px solid var(--prio-n);}
-.quad-lote.q-prio-prioritario{background:var(--prio-p-bg);color:#fff;border:2px solid var(--prio-p);}
-/* Urgente = amarelo: fundo claro de mais para texto branco, por isso usa texto escuro para se ler bem */
-.quad-lote.q-prio-urgente{background:var(--prio-u-bg);color:#3a2c05;border:2px solid var(--prio-u);}
+/* mesmo "botão" colorido por prioridade da grelha de Lotes, mas em formato pill (não quadrado) para
+   encabeçar o cartão do Levantamento — usa as mesmas classes q-prio-* para ter sempre a cor certa */
+.quad-lote.lev-tile{aspect-ratio:auto;display:inline-flex;padding:9px 18px;font-size:14px;margin-bottom:10px;}
+.quad-lote.q-prio-normal{background:var(--prio-n-bg);color:var(--text);border:2px solid var(--prio-n);}
+/* Prioritário = coral da marca: fundo claro de mais para texto branco, por isso usa texto escuro para se ler bem */
+.quad-lote.q-prio-prioritario{background:var(--prio-p-bg);color:var(--text);border:2px solid var(--prio-p);}
+/* Urgente = roxo escuro da marca (o tom mais intenso): fundo já escuro o suficiente para texto branco */
+.quad-lote.q-prio-urgente{background:var(--prio-u-bg);color:#fff;border:2px solid var(--prio-u);}
+/* visual mais clean no Levantamento: sem o contorno de 2px (fica só a cor de preenchimento), com uma
+   sombra suave a dar profundidade em vez do border */
+.quad-lote.lev-tile{border:none;box-shadow:0 2px 6px rgba(44,33,48,.18);}
+/* nº dos frascos a levantar em destaque — é a informação mais importante do cartão para quem vai
+   fisicamente recolher o material */
+.frascos-levantar{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;}
+.frascos-levantar .fl-label{font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.03em;}
+.frascos-levantar .fl-num{font-size:22px;font-weight:800;color:var(--text);}
 /* letra U/P no canto — reforça a cor com texto, como pedido */
 .quad-letra{position:absolute;top:4px;right:4px;width:18px;height:18px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:800;color:#fff;}
 .quad-letra.l-u{background:var(--prio-u);}
 .quad-letra.l-p{background:var(--prio-p);}
 /* distintivo Bartops — independente da prioridade, por isso cor à parte (azul-acinzentado) */
 .quad-bartops{position:absolute;top:4px;left:4px;width:18px;height:18px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:800;color:#fff;background:var(--bartops);}
-/* barra de estado (aberto / aguarda LAB / fechado) — independente da cor de prioridade */
-.quad-estado-barra{position:absolute;left:8px;right:8px;bottom:3px;height:4px;border-radius:3px;}
-.quad-estado-barra.e-tania{background:var(--status-lab);}
-.quad-estado-barra.e-aprovado{background:var(--green);}
-.quad-estado-barra.e-rejeitado{background:var(--red);}
+/* estado escrito por extenso dentro do próprio quadrado (Planeado / WIP) — independente da cor de
+   prioridade. Encostado à base, com fundo semi-transparente para se ler bem em cima de qualquer cor. */
+.quad-estado-txt{position:absolute;left:0;right:0;bottom:0;padding:3px 2px;font-size:9.5px;font-weight:800;letter-spacing:.03em;text-transform:uppercase;color:#fff;text-align:center;border-radius:0 0 9px 9px;}
+/* Planeado = o mais claro (ainda não começou) · WIP = já mais intenso (o coral da marca), texto branco */
+.quad-estado-txt.e-planeado{background:rgba(255,255,255,.6);color:var(--text);}
+.quad-estado-txt.e-wip{background:var(--status-lab);color:#fff;}
 /* lote importado hoje mas só pode ser cheirado amanhã (D+1) — visível já, mas assinalado como ainda não disponível */
 .quad-lote.futuro{opacity:.6;border-style:dashed;}
 
@@ -212,23 +230,29 @@ main{padding:14px 14px 10px;}
 .empty-note{color:var(--muted);font-size:13px;padding:14px 4px;text-align:center;}
 
 /* Bottom nav */
-.bottomnav{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:var(--shell-max);background:var(--panel);border-top:1px solid var(--border);display:flex;align-items:center;justify-content:space-around;padding:8px 10px calc(8px + env(safe-area-inset-bottom));z-index:50;box-shadow:0 -2px 10px rgba(59,45,25,.08);}
-.nav-btn{background:none;border:none;display:flex;flex-direction:column;align-items:center;gap:2px;color:var(--muted);font-size:10.5px;font-weight:600;padding:4px 10px;}
+.bottomnav{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:var(--shell-max);background:var(--panel);border-top:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;padding:8px 10px calc(8px + env(safe-area-inset-bottom));z-index:50;box-shadow:0 -2px 10px rgba(44,33,48,.08);}
+/* os botões ficam em dois grupos de largura igual (flex:1 cada) dos dois lados do "+" — assim o
+   botão fica sempre mesmo ao centro, seja qual for o nº de botões de cada lado (ex: 2 à esquerda,
+   1 à direita, depois de Prioridades e Levantamento terem passado a viver só na Logística). */
+.nav-side{display:flex;align-items:center;justify-content:space-around;flex:1;}
+.nav-btn{background:none;border:none;display:flex;flex-direction:column;align-items:center;gap:2px;color:var(--muted);font-size:10.5px;font-weight:600;padding:4px 10px;position:relative;}
 .nav-btn.active{color:var(--accent-dark);}
+.nav-badge{position:absolute;top:-2px;right:2px;background:var(--red);color:#fff;font-size:9.5px;font-weight:800;min-width:15px;height:15px;border-radius:8px;display:flex;align-items:center;justify-content:center;padding:0 3px;}
+.nav-badge.hidden{display:none;}
 .nav-btn .ic{font-size:19px;}
 .nav-fab{background:var(--accent);color:#fff;border:none;border-radius:50%;width:52px;height:52px;display:flex;align-items:center;justify-content:center;font-size:26px;margin-top:-28px;box-shadow:0 3px 10px rgba(176,141,87,.5);}
 
 /* Overlay de carregamento (importação de Excel) */
 .loading-overlay{position:fixed;inset:0;background:rgba(20,25,20,.55);display:flex;align-items:center;justify-content:center;z-index:300;}
 .loading-overlay.hidden{display:none;}
-.loading-box{background:var(--panel);border-radius:14px;padding:26px 30px;display:flex;flex-direction:column;align-items:center;gap:14px;box-shadow:0 6px 30px rgba(59,45,25,.35);}
+.loading-box{background:var(--panel);border-radius:14px;padding:26px 30px;display:flex;flex-direction:column;align-items:center;gap:14px;box-shadow:0 6px 30px rgba(44,33,48,.35);}
 .loading-spinner{width:34px;height:34px;border:4px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite;}
 @keyframes spin{to{transform:rotate(360deg);}}
 .loading-box .loading-txt{font-size:14px;font-weight:700;color:var(--text);text-align:center;}
 
 /* Modal */
 .overlay{position:fixed;inset:0;background:rgba(20,25,20,.55);display:flex;align-items:flex-end;justify-content:center;z-index:100;}
-.modal{background:var(--panel);border-radius:16px 16px 0 0;max-width:var(--shell-max);width:100%;max-height:92vh;overflow-y:auto;padding:18px 16px 26px;box-shadow:0 -6px 30px rgba(59,45,25,.28);}
+.modal{background:var(--panel);border-radius:16px 16px 0 0;max-width:var(--shell-max);width:100%;max-height:92vh;overflow-y:auto;padding:18px 16px 26px;box-shadow:0 -6px 30px rgba(44,33,48,.28);}
 @media (min-width:540px){
   .overlay{align-items:center;padding:20px;}
   .modal{border-radius:16px;max-height:88vh;}
@@ -265,6 +289,24 @@ legend{font-size:11.5px;font-weight:800;color:var(--muted);padding:0 6px;text-tr
 .chip-toggle button{border:1.5px solid var(--border);background:#faf5ea;border-radius:20px;padding:9px 13px;font-size:12.5px;font-weight:700;color:var(--muted);}
 .chip-toggle button.on{background:var(--red-bg);border-color:var(--red);color:var(--red);}
 
+/* seletor de aroma de um frasco (usado ao tocar numa peça da grelha) */
+.seq-header{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:10px;}
+.seq-contador{font-size:15px;font-weight:800;color:var(--text);text-align:center;}
+.seq-contador strong{font-size:20px;color:var(--accent-dark);}
+.aroma-picker{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:2px 0 14px;}
+.aroma-picker button{border:1.5px solid var(--border);background:#faf5ea;border-radius:14px;padding:20px 8px;font-size:15px;font-weight:800;color:var(--text);min-height:64px;line-height:1.25;}
+.aroma-picker button.on{background:var(--red-bg);border-color:var(--red);color:var(--red);}
+.aroma-picker button.aroma-full{grid-column:1 / -1;}
+.aroma-limpo{display:block;width:100%;text-align:center;background:none;border:none;color:var(--muted);font-size:12.5px;font-weight:600;text-decoration:underline;padding:6px;}
+
+/* grelha de frascos (nº1 a nº50): toque direto e em qualquer ordem, sem navegação forçada */
+.frasco-grid{display:grid;grid-template-columns:repeat(8,1fr);gap:6px;margin:4px 0 14px;}
+.frasco-tile{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;border:1.5px solid var(--border);background:#faf5ea;border-radius:10px;padding:6px 1px;min-height:42px;color:var(--text);}
+.frasco-tile .ft-num{font-size:14px;font-weight:800;}
+.frasco-tile .ft-cod{font-size:9px;font-weight:700;letter-spacing:.2px;}
+.frasco-tile.marcado{background:var(--red-bg);border-color:var(--red);color:var(--red);}
+.frasco-tile.frasco-vazio{border-color:transparent;background:transparent;pointer-events:none;}
+
 .itens-list{display:flex;flex-direction:column;gap:6px;margin:6px 0 4px;}
 .item-row{display:flex;align-items:center;justify-content:space-between;background:#f3ecdb;border-radius:9px;padding:8px 10px;font-size:13px;}
 .item-row .fn{font-weight:800;min-width:44px;}
@@ -274,6 +316,37 @@ legend{font-size:11.5px;font-weight:800;color:var(--muted);padding:0 6px;text-tr
 .compare-table{width:100%;border-collapse:collapse;margin:8px 0 4px;font-size:12.5px;}
 .compare-table th,.compare-table td{border:1px solid var(--border);padding:6px 7px;text-align:center;}
 .compare-table th{background:#ece3d0;font-size:10.5px;text-transform:uppercase;color:var(--muted);}
+.tabela-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;}
+
+/* letra U/P reutilizável (grelha LAB e linhas do Histórico) */
+.letra-prio{display:inline-flex;align-items:center;justify-content:center;width:14px;height:14px;border-radius:50%;font-size:8.5px;font-weight:800;color:#fff;flex-shrink:0;}
+.letra-prio.l-u{background:var(--prio-u);}
+.letra-prio.l-p{background:var(--prio-p);}
+
+/* LAB: 3 colunas lado a lado (Planeados/WIP/Concluídos), visíveis de imediato, sem separadores —
+   só o nº do lote (+ letra U/P quando aplicável); clicar abre a ficha do lote com o resto da informação. */
+.lab-colunas{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:6px 0 14px;}
+.lab-col{background:#f3ecdb;border:1px solid var(--border);border-radius:10px;padding:8px 6px;min-height:56px;}
+.lab-col-titulo{font-size:10.5px;font-weight:800;text-transform:uppercase;color:var(--muted);text-align:center;margin-bottom:8px;position:relative;}
+.lab-col-titulo .n{color:var(--accent-dark);font-size:11px;}
+/* copia os nºs de lote desta coluna, um por linha, para o Excel colar direto numa coluna (em vez de
+   selecionar/copiar os botões à mão, que concatena tudo numa única célula) */
+.lab-col-copy{display:block;margin:4px auto 0;border:none;background:none;color:var(--accent-dark);font-size:9.5px;font-weight:700;text-decoration:underline;text-transform:none;padding:2px 4px;}
+.lab-col-lista{display:flex;flex-direction:column;gap:6px;}
+.lab-lote-btn{display:flex;align-items:center;justify-content:center;gap:4px;background:var(--panel);border:1.5px solid var(--border);border-radius:8px;padding:7px 4px;font-size:11px;font-weight:800;color:var(--text);word-break:break-all;text-align:center;}
+.lab-lote-btn:active{transform:scale(.96);}
+
+/* Histórico: linhas compactas (Data · Nº Lote · letra) que expandem ao tocar, em vez de uma
+   tabela larga com scroll horizontal — o resto da informação (provadores) só aparece se pedida. */
+.hist-row{background:#f3ecdb;border:1px solid var(--border);border-radius:9px;margin-bottom:6px;overflow:hidden;}
+.hist-row summary{list-style:none;cursor:pointer;display:flex;align-items:center;gap:10px;padding:10px 12px;font-size:12.5px;font-weight:700;color:var(--text);}
+.hist-row summary::-webkit-details-marker{display:none;}
+.hist-row summary::after{content:'▾ ver detalhe';margin-left:auto;color:var(--muted);font-size:10.5px;font-weight:600;}
+.hist-row[open] summary::after{content:'▴ fechar';}
+.hist-row .hr-data{color:var(--muted);font-weight:600;min-width:74px;}
+.hist-row .hr-lote{flex:0 0 auto;}
+.hist-row-detalhe{padding:2px 12px 12px;font-size:12px;color:var(--muted);display:flex;flex-direction:column;gap:4px;border-top:1px solid var(--border);}
+.hist-row-detalhe strong{color:var(--text);}
 
 .tally{display:flex;gap:10px;margin:10px 0 14px;}
 .tally .box{flex:1;background:#f3ecdb;border-radius:9px;padding:10px 6px;text-align:center;}
@@ -316,6 +389,7 @@ textarea#taPrioridadesInput{min-height:110px;font-family:ui-monospace,monospace;
       <button onclick="identificarLote()">Abrir</button>
     </div>
     <div id="searchResults" class="search-results hidden no-print"></div>
+    <button class="btn-hist-csv no-print" onclick="exportarTabelaLABCsv()">Exportar Histórico (CSV)</button>
   </header>
 
   <main>
@@ -323,6 +397,7 @@ textarea#taPrioridadesInput{min-height:110px;font-family:ui-monospace,monospace;
       <div class="toolbar-mini no-print">
         <button class="btn btn-sm btn-primary" onclick="abrirScannerCodigoBarras()">Ler Código de Barras</button>
         <button class="btn btn-sm btn-primary" onclick="document.getElementById('fileOrdens').click()" title="Seleciona os 2 ficheiros ao mesmo tempo: Amostragens 2026 + Ordem de Trabalhos 2026">Importar Ordens (Excel)</button>
+        <button class="btn btn-sm hidden" id="btnGerarLoteTeste" style="border:1px dashed var(--muted);" onclick="gerarLoteTeste()" title="Fase de testes — cria um lote de teste vazio, disponível hoje, para correres a prova toda à mão. Tira este botão depois de validares tudo.">Gerar lote de teste (DEV)</button>
       </div>
       <input type="file" id="fileOrdens" accept=".xlsx,.xls,.xlsm,.csv" multiple class="hidden">
       <div class="legend-cores">
@@ -331,14 +406,43 @@ textarea#taPrioridadesInput{min-height:110px;font-family:ui-monospace,monospace;
         <span class="lg-item"><span class="lg-dot lg-urgente"></span>U Urgente</span>
         <span class="lg-item"><span class="lg-dot lg-bartops"></span>B Bartops</span>
       </div>
-      <div class="legend-cores" style="margin-top:-8px;">
-        <span class="lg-item">Barra em baixo do quadrado: amarelo intenso = aguarda decisão do LAB · verde = aprovado · vermelho = rejeitado</span>
-      </div>
       <div class="section-title">Lotes de hoje <span id="contagemHoje"></span></div>
       <div class="grade-lotes" id="gradeLotes"></div>
     </section>
 
-    <section id="view-prioridades" class="view hidden">
+    
+
+    <section id="view-lab" class="view hidden">
+      <div class="section-title">LAB — Estado das Provas</div>
+      <div class="lab-colunas">
+        <div class="lab-col">
+          <div class="lab-col-titulo">Planeados <span class="n" id="labContPlaneados">0</span>
+            <button type="button" class="lab-col-copy no-print" onclick="copiarColunaLAB('planeados', this)" title="Copiar números dos lotes — um por linha, para colar diretamente numa coluna no Excel">Copiar</button>
+          </div>
+          <div class="lab-col-lista" id="labColPlaneados"></div>
+        </div>
+        <div class="lab-col">
+          <div class="lab-col-titulo">WIP <span class="n" id="labContWip">0</span>
+            <button type="button" class="lab-col-copy no-print" onclick="copiarColunaLAB('wip', this)" title="Copiar números dos lotes — um por linha, para colar diretamente numa coluna no Excel">Copiar</button>
+          </div>
+          <div class="lab-col-lista" id="labColWip"></div>
+        </div>
+        <div class="lab-col">
+          <div class="lab-col-titulo">Concluídos <span class="n" id="labContConcluidos">0</span>
+            <button type="button" class="lab-col-copy no-print" onclick="copiarColunaLAB('concluidos', this)" title="Copiar números dos lotes — um por linha, para colar diretamente numa coluna no Excel">Copiar</button>
+          </div>
+          <div class="lab-col-lista" id="labColConcluidos"></div>
+        </div>
+      </div>
+      <div class="toolbar-mini no-print">
+        <button class="btn btn-sm" id="btnToggleHistoricoLAB" onclick="toggleHistoricoLAB()">Ver Histórico de Conclusões</button>
+      </div>
+      <div id="blocoHistoricoLAB" class="hidden">
+        <div class="tabela-scroll" id="tabelaLAB"></div>
+      </div>
+    </section>
+
+    <section id="view-levantamento" class="view hidden">
       <div class="section-title">Importar lista do planeamento</div>
       <div class="toolbar-mini">
         <button class="btn btn-sm" onclick="toggleImportBox()">Colar lista recebida por email</button>
@@ -350,50 +454,28 @@ textarea#taPrioridadesInput{min-height:110px;font-family:ui-monospace,monospace;
         </div>
         <button class="btn btn-primary btn-block" onclick="importarPrioridades()">Importar / Atualizar Prioridades</button>
       </div>
-      <div class="section-title">Lotes em aberto <span></span></div>
-      <div class="toolbar-mini no-print">
-        <button class="btn btn-sm" onclick="window.print()">Imprimir</button>
-        <button class="btn btn-sm" onclick="document.getElementById('btnExportCsv').click()">Exportar CSV</button>
-        <button class="btn btn-sm" onclick="exportarLotesXlsx()">Exportar XLS</button>
-      </div>
-      <div class="toolbar-mini no-print" id="toolbarSelecao">
-        <button class="btn btn-sm" id="btnAtivarSelecao" onclick="ativarModoSelecao()">Selecionar vários</button>
-      </div>
-      <div id="listaPrioridades"></div>
-    </section>
 
-    <section id="view-historico" class="view hidden">
-      <div class="section-title">Histórico de Decisões</div>
-      <div class="toolbar-mini no-print">
-        <button class="btn btn-sm hist-filtro on" data-f="todos" onclick="filtrarHistorico('todos')">Todos</button>
-        <button class="btn btn-sm hist-filtro" data-f="aprovado" onclick="filtrarHistorico('aprovado')">Aprovados</button>
-        <button class="btn btn-sm hist-filtro" data-f="rejeitado" onclick="filtrarHistorico('rejeitado')">Rejeitados</button>
-      </div>
-      <div class="toolbar-mini no-print">
-        <button class="btn btn-sm btn-primary btn-block" onclick="exportarHistoricoCsv()">Exportar Histórico (CSV)</button>
-      </div>
-      <div id="listaHistorico"></div>
-    </section>
-
-    <section id="view-levantamento" class="view hidden">
       <div class="section-title">Levantamento de Material — Lotes Rejeitados</div>
       <div class="legend-cores" style="margin-top:-6px;">
-        <span class="lg-item">Para a Logística: o que recolher e lavar depois de cada lote rejeitado. Marca "Material levantado" quando estiver feito.</span>
+        <span class="lg-item">Para a Logística: quais os frascos a recolher e lavar depois de cada lote rejeitado. "Por levantar" mostra só os rejeitados de hoje — limpa sozinho todos os dias.</span>
       </div>
       <div class="toolbar-mini no-print">
-        <button class="btn btn-sm hist-filtro on" data-lf="pendentes" onclick="filtrarLevantamento('pendentes')">Por levantar</button>
-        <button class="btn btn-sm hist-filtro" data-lf="todos" onclick="filtrarLevantamento('todos')">Todos os rejeitados</button>
+        <button class="btn btn-sm hist-filtro on" data-lf="pendentes" onclick="filtrarLevantamento('pendentes')">Por levantar (hoje)</button>
+        <button class="btn btn-sm hist-filtro" data-lf="todos" onclick="filtrarLevantamento('todos')">Histórico</button>
       </div>
       <div id="listaLevantamento"></div>
     </section>
   </main>
 
   <nav class="bottomnav no-print">
-    <button class="nav-btn active" id="navInicio" onclick="switchView('inicio')">Início</button>
-    <button class="nav-btn" id="navHistorico" onclick="switchView('historico')">Histórico</button>
+    <div class="nav-side">
+      <button class="nav-btn active" id="navInicio" onclick="switchView('inicio')">Lotes</button>
+      <button class="nav-btn" id="navLab" onclick="switchView('lab')">LAB</button>
+    </div>
     <button class="nav-fab" onclick="identificarLote()">+</button>
-    <button class="nav-btn" id="navPrioridades" onclick="switchView('prioridades')">Prioridades</button>
-    <button class="nav-btn" id="navLevantamento" onclick="switchView('levantamento')">Levantamento</button>
+    <div class="nav-side">
+      <button class="nav-btn" id="navLevantamento" onclick="switchView('levantamento')">Logística<span class="nav-badge hidden" id="badgeP3" title="Lote(s) à espera do 3º provador">0</span></button>
+    </div>
   </nav>
 </div>
 
@@ -402,8 +484,7 @@ textarea#taPrioridadesInput{min-height:110px;font-family:ui-monospace,monospace;
   <div class="loading-box"><div class="loading-spinner"></div><div class="loading-txt" id="loadingTxt">A processar…</div></div>
 </div>
 <div id="fileHelpers" class="hidden">
-  <button class="btn hidden" id="btnExportCsv"></button>
-</div>
+  </div>
 
 <script>
 /* ==================== ESTADO / DADOS ==================== */
@@ -428,6 +509,15 @@ function garantirCamposNovos(l){
   if(!l.registos.p3) l.registos.p3 = { itens:[], apreciacao:'', observacoes:'', concluido:false };
   if(!l.revisaoConjunta) l.revisaoConjunta = { feita:false, observacoes:'', data:'' };
   if(l.provador3===undefined) l.provador3 = '';
+  if(l.provaAbertaEm===undefined) l.provaAbertaEm = '';
+  // Recupera a Data de Abertura da Prova em lotes onde o Provador 1 já entrou (nome preenchido) mas
+  // este campo nunca chegou a ser gravado — acontece em lotes cujo Provador 1 entrou numa versão
+  // anterior da app, antes deste campo existir. Sem isto, ficaria "—" para sempre mesmo já concluído.
+  // Usa a melhor data disponível como aproximação: quando o Provador 1 assinou, ou a última
+  // atualização do lote, ou a data de criação — sempre melhor do que nunca preencher.
+  if(l.provador1 && !l.provaAbertaEm){
+    l.provaAbertaEm = (l.registos.p1 && l.registos.p1.assinadoEm) || l.atualizadoEm || l.criadoEm || new Date().toISOString();
+  }
   return l;
 }
 function migrarTodosLotes(lotes){
@@ -481,6 +571,22 @@ function conectarSocket(){
     renderAll();
   });
 }
+// Apaga qualquer lote de teste (prefixo LT0999..., criado pelo botão "Gerar lote de teste (DEV)")
+// que ainda esteja na cache local ou no servidor — para arrancar "a zeros" na publicação em Railway.
+// Nunca apaga lotes reais (esses vêm sempre do "Importar Ordens (Excel)", com outro prefixo).
+function limparLotesDeTeste(){
+  const PREFIXO_TESTE = 'LT0999';
+  let apagou = false;
+  Object.keys(state.lotes).forEach(num=>{
+    if(num.startsWith(PREFIXO_TESTE)){
+      delete state.lotes[num];
+      fetch('/api/lotes/'+encodeURIComponent(num), {method:'DELETE'}).catch(()=>{});
+      apagou = true;
+    }
+  });
+  if(apagou) guardarLocal();
+  return apagou;
+}
 async function hydrate(){
   try{
     const raw = localStorage.getItem(STORAGE_KEY);
@@ -488,12 +594,14 @@ async function hydrate(){
   }catch(e){}
   if(!state.lotes) state.lotes = {};
   migrarTodosLotes(state.lotes);
+  limparLotesDeTeste();
   renderAll(); // mostra logo o que já estava em cache, sem esperar pela rede
   try{
     const res = await fetch('/api/lotes');
     if(res.ok){
       const data = await res.json();
       state.lotes = mergeLotes(state.lotes, (data && data.lotes) || {});
+      limparLotesDeTeste(); // também limpa lotes de teste que já tivessem chegado a sincronizar no servidor
       guardarLocal();
       renderAll();
       scheduleSync(); // se havia alterações feitas offline, sobem agora para o servidor
@@ -513,6 +621,7 @@ function criarLoteVazio(numero){
     numeroFrascos: 50,
     numeroRolhasPorFrasco: 3,
     previstoHoje: false, diaPrevisto: '',
+    provaAbertaEm: '', // data em que o Provador 1 entrou e começou a prova (fica em branco até lá)
     provador1:'', provador2:'', provador3:'', hora1:'', hora2:'',
     fotoEtiqueta: null, fotoCapturadaPor:'', dataFotografia:'',
     registos: {
@@ -527,6 +636,31 @@ function criarLoteVazio(numero){
     criadoEm: new Date().toISOString(),
     atualizadoEm: new Date().toISOString()
   };
+}
+
+/* ==================== DADOS DE TESTE (bloqueado antes de publicar no Railway) ====================
+   Gera UM lote de teste de cada vez (prefixo LT0999...), já disponível hoje (sem esperar pelo D+1 nem
+   por um Excel real), para poderes correr a prova toda à mão (Iniciar Prova → Provador 1 → Provador 2 →
+   …) e ver as regras novas a funcionar. Clica outra vez sempre que quiseres mais um.
+   O botão fica escondido em produção (14/09/2026) — muda para "true" só temporariamente se precisares
+   de testar outra vez, e volta a pôr "false" antes de publicar. */
+const DEV_MOSTRAR_GERAR_LOTE_TESTE = false;
+function aplicarFlagDevGerarLoteTeste(){
+  const btn = document.getElementById('btnGerarLoteTeste');
+  if(btn) btn.classList.toggle('hidden', !DEV_MOSTRAR_GERAR_LOTE_TESTE);
+}
+function gerarLoteTeste(){
+  let n = 1;
+  while(state.lotes['LT0999' + String(n).padStart(4,'0')]) n++;
+  const numero = 'LT0999' + String(n).padStart(4,'0');
+  const l = criarLoteVazio(numero);
+  l.diaPrevisto = ontemStr(); // já disponível hoje, não bloqueado por D+1
+  l.prioridade = 'normal';
+  state.lotes[numero] = l;
+  saveState();
+  renderAll();
+  switchView('levantamento');
+  alert(`Lote de teste ${numero} criado — já disponível para provar. Abre-o em "Prioridades" e usa "Iniciar Prova" normalmente.\n\nPodes apagá-lo depois em Prioridades → Selecionar vários.`);
 }
 
 /* ==================== LÓGICA DE DECISÃO ====================
@@ -616,34 +750,181 @@ function uniaoDetalhePorFrasco(lote){
     return { frasco:n, tipoLabel: tipo==='tca'?'TCA':(tipo==='mofo'?'Mofo':'Outro') };
   });
 }
+
+/* ==================== REGRA AUTOMÁTICA DO LAB (definida com a Joana em 11/09/2026) ====================
+   O LAB deixou de "decidir" — passou só a receber informação. A app decide sozinha assim que a união
+   dos frascos (P1+P2, ou P1+P2+P3 depois de um cruzamento) fica resolvida (sem divergência de conjunto
+   por decidir):
+     - 0 frascos com TCA ou Mofo (frascos só com "Outro Aroma" não contam para nenhuma regra automática,
+       ficam só como informação) → APROVADO automático.
+     - 1 a 3 frascos com TCA/Mofo, e nenhum "Mofo Forte" → REJEITADO automático. Ao chegar exatamente a
+       3, o lote fica ainda classificado como "TCA Forte" (só uma etiqueta/registo, não muda a decisão).
+     - 4 ou mais frascos com TCA/Mofo, OU qualquer frasco com "Mofo Forte" → não decide sozinha: vai a
+       CONFRONTO — só o 3º provador desempata (Sim/Não), o LAB não participa nesta decisão.
+   Isto substitui a regra antiga ("mais de 3 rejeita, LAB confirma sempre por um clique"). */
+function combinarTipoDetalhado(tipos){
+  // desempate por severidade: TCA Forte > TCA Percetível > Mofo Forte > Mofo Percetível > Outro
+  if(tipos.includes('tcaForte')) return 'tcaForte';
+  if(tipos.includes('tcaPercetivel')) return 'tcaPercetivel';
+  if(tipos.includes('mofoForte')) return 'mofoForte';
+  if(tipos.includes('mofoPercetivel')) return 'mofoPercetivel';
+  if(tipos.includes('outro')) return 'outro';
+  return null;
+}
+function tipoFrascoDetalhado(it){
+  if(!it) return null;
+  if(it.tcaF) return 'tcaForte';
+  if(it.tcaP) return 'tcaPercetivel';
+  if(it.mofoF) return 'mofoForte';
+  if(it.mofoP) return 'mofoPercetivel';
+  if(it.outro) return 'outro';
+  return null;
+}
+/* Tally da união (P1+P2+P3) preservando as 5 categorias (Forte/Percetível), para a regra automática
+   e para os relatórios do LAB (Planeados/WIP/Concluídos, na Fase 2). */
+function uniaoTallyDetalhada(lote){
+  const fontes = [lote.registos.p1.itens, lote.registos.p2.itens, (lote.registos.p3||{}).itens].filter(Boolean);
+  const porFrasco = {};
+  fontes.forEach(itens=>{
+    (itens||[]).forEach(it=>{
+      const t = tipoFrascoDetalhado(it);
+      if(!t) return;
+      (porFrasco[it.frasco] = porFrasco[it.frasco]||[]).push(t);
+    });
+  });
+  let tcaForte=0, tcaPercetivel=0, mofoForte=0, mofoPercetivel=0, outros=0;
+  Object.keys(porFrasco).forEach(n=>{
+    const tipo = combinarTipoDetalhado(porFrasco[n]);
+    if(tipo==='tcaForte') tcaForte++;
+    else if(tipo==='tcaPercetivel') tcaPercetivel++;
+    else if(tipo==='mofoForte') mofoForte++;
+    else if(tipo==='mofoPercetivel') mofoPercetivel++;
+    else if(tipo==='outro') outros++;
+  });
+  const contaveis = tcaForte + tcaPercetivel + mofoForte + mofoPercetivel; // "Outro Aroma" não conta
+  return { tcaForte, tcaPercetivel, mofoForte, mofoPercetivel, outros, contaveis };
+}
+/* Tabela de comparação por frasco: o LAB precisa de ver exatamente QUAIS frascos têm aroma e o que
+   cada provador encontrou (não só a contagem por categoria) — usada na ficha do lote e no Histórico. */
+function framesUniaoLote(lote){
+  const nums = new Set();
+  ['p1','p2','p3'].forEach(p=> (lote.registos[p].itens||[]).forEach(it=> nums.add(it.frasco)));
+  return Array.from(nums).sort((a,b)=>a-b);
+}
+function itemFrascoProvador(lote, p, n){
+  return (lote.registos[p].itens||[]).find(it=> it.frasco===n);
+}
+function htmlTabelaFrascosLote(lote){
+  const frascos = framesUniaoLote(lote);
+  if(!frascos.length) return `<div class="empty-note" style="padding:6px 0;">Nenhum frasco com aroma registado até agora.</div>`;
+  const temP3 = !!lote.provador3;
+  const linhas = frascos.map(n=>{
+    const c1 = codAroma(itemFrascoProvador(lote,'p1',n)) || '—';
+    const c2 = codAroma(itemFrascoProvador(lote,'p2',n)) || '—';
+    const c3 = temP3 ? (codAroma(itemFrascoProvador(lote,'p3',n)) || '—') : '';
+    return `<tr><td>${n}</td><td>${c1}</td><td>${c2}</td>${temP3?`<td>${c3}</td>`:''}</tr>`;
+  }).join('');
+  return `<table class="compare-table">
+    <thead><tr><th>Frasco</th><th>Provador 1</th><th>Provador 2</th>${temP3?'<th>Provador 3</th>':''}</tr></thead>
+    <tbody>${linhas}</tbody>
+  </table>`;
+}
+function textoFrascosLoteCsv(lote){
+  const frascos = framesUniaoLote(lote);
+  if(!frascos.length) return '';
+  const temP3 = !!lote.provador3;
+  return frascos.map(n=>{
+    const c1 = codAroma(itemFrascoProvador(lote,'p1',n)) || '-';
+    const c2 = codAroma(itemFrascoProvador(lote,'p2',n)) || '-';
+    const c3 = temP3 ? (codAroma(itemFrascoProvador(lote,'p3',n)) || '-') : null;
+    return `F${n}:${c1}/${c2}${temP3?`/${c3}`:''}`;
+  }).join('; ');
+}
+/* Precisa do 3º provador quando: (a) sobra divergência de conjunto entre P1/P2 depois da Revisão
+   Conjunta, OU (b) mesmo sem divergência, o total (só P1+P2) já chega a 4 frascos com TCA/Mofo, ou
+   tem algum Mofo Forte. Nestes casos o P3 é chamado — e o que ele faz é igual a P1/P2: regista os
+   frascos e "Conclui e Assina". Não há nenhum ecrã à parte de "decisão" nem botões Aprovar/Rejeitar:
+   assim que o Provador 3 assina, a informação termina ali — o total (agora com P1+P2+P3) decide
+   sozinho e direto, sem mais nenhum passo, e já vai para o Levantamento se for caso disso. */
+function precisaDeProvador3(lote){
+  const divergeSet = calcularDivergenciaSet(lote);
+  if(divergeSet.length) return true;
+  const det = uniaoTallyDetalhada(lote); // ainda só com P1+P2 nesta fase
+  return det.contaveis>=4 || det.mofoForte>0;
+}
+/* União (sem nada por decidir) — sem necessidade de 3º provador, ou já assinado pelo Provador 3 */
+function uniaoResolvida(lote){
+  if(!lote.registos.p1.concluido || !lote.registos.p2.concluido) return false;
+  const divergeSet = calcularDivergenciaSet(lote);
+  if(divergeSet.length && !lote.revisaoConjunta.feita) return false; // ainda tem de rever em conjunto primeiro
+  if(precisaDeProvador3(lote) && !lote.registos.p3.concluido) return false;
+  return true;
+}
+function finalizarAutomatico(numero, final, classificacao, motivo){
+  const lote = state.lotes[numero];
+  lote.decisao.final = final;
+  lote.decisao.decididoPor = lote.registos.p3.concluido ? (lote.provador3 || 'Provador 3') : 'Automático (regra da app)';
+  lote.decisao.comentarios = motivo;
+  lote.decisao.classificacao = classificacao || null;
+  lote.decisao.data = new Date().toISOString().slice(0,10);
+  lote.atualizadoEm = new Date().toISOString();
+}
+/* Tenta fechar o lote sozinho, sem precisar de ninguém carregar em "Aprovar" ou "Rejeitar". Devolve
+   true se decidiu. Chamar sempre a seguir a qualquer registo que possa resolver a união (Provador 2,
+   Revisão Conjunta, Provador 3). Também é chamada de forma preventiva a partir de renderAll(), para
+   lotes antigos que ficaram parados antes desta regra existir. */
+function tentarAutoFinalizar(numero){
+  const lote = state.lotes[numero];
+  if(!lote || lote.decisao.final) return false;
+  if(!uniaoResolvida(lote)) return false;
+  const det = uniaoTallyDetalhada(lote);
+  if(lote.registos.p3.concluido){
+    // "A informação termina com a decisão do Provador 3" — regra direta: há defeito ou não há.
+    if(det.contaveis===0){
+      finalizarAutomatico(numero, 'aprovado', null, 'Sem qualquer frasco com TCA ou Mofo, mesmo depois do Provador 3.');
+    } else {
+      const classificacao = det.contaveis>=3 ? 'TCA Forte' : null;
+      finalizarAutomatico(numero, 'rejeitado', classificacao, `${det.contaveis} frasco(s) com TCA/Mofo depois do Provador 3 — segue para o Levantamento.`);
+    }
+    return true;
+  }
+  // sem necessidade de 3º provador — decide já só com P1+P2
+  if(det.contaveis===0){
+    finalizarAutomatico(numero, 'aprovado', null, 'Sem qualquer frasco com TCA ou Mofo (prova coincidente entre provadores).');
+    return true;
+  }
+  const classificacao = det.contaveis>=3 ? 'TCA Forte' : null;
+  const motivo = `${det.contaveis} frasco(s) com TCA/Mofo (união dos provadores).`;
+  finalizarAutomatico(numero, 'rejeitado', classificacao, motivo);
+  return true;
+}
 function computeStatus(lote){
   if(lote.decisao.final) return lote.decisao.final; // 'aprovado' | 'rejeitado'
   const p1ok = lote.registos.p1.concluido, p2ok = lote.registos.p2.concluido;
   if(!p1ok) return 'prep';
   if(!p2ok) return 'p2';
   const divergeSet = calcularDivergenciaSet(lote);
-  if(divergeSet.length){
-    if(!lote.revisaoConjunta.feita) return 'revisao_conjunta';
-    if(!lote.registos.p3.concluido) return 'aguarda_p3';
-    return 'tania'; // com o Provador 3 já é um cruzamento — liberta o bloqueio, o LAB decide
-  }
-  // conjunto coincide entre P1 e P2 — se não há qualquer aroma, fecha logo sem precisar do LAB
-  const uniao = uniaoTally(lote);
-  if(uniao.total===0) return 'aguarda_fecho';
-  return lote.registos.tania.concluido ? 'aguarda_fecho' : 'tania';
+  if(divergeSet.length && !lote.revisaoConjunta.feita) return 'revisao_conjunta';
+  if(precisaDeProvador3(lote) && !lote.registos.p3.concluido) return 'aguarda_p3';
+  // união resolvida — só chega aqui por uma fração de segundo, antes de tentarAutoFinalizar correr
+  return 'aguarda_p3';
 }
 const STATUS_META = {
   prep:{label:'Aguarda Provador 1', cls:'t-prep'},
   p2:{label:'Aguarda Provador 2', cls:'t-p2'},
   revisao_conjunta:{label:'Divergência — Rever em Conjunto', cls:'t-tania'},
   aguarda_p3:{label:'Aguarda Provador 3', cls:'t-tania'},
-  aguarda_fecho:{label:'Aguarda Fecho', cls:'t-fecho'},
-  tania:{label:'Aguarda decisão do LAB', cls:'t-tania'},
-  aprovado:{label:'Aprovados', cls:'t-aprov'},
-  rejeitado:{label:'Rejeitados', cls:'t-rej'}
+  aprovado:{label:'Prova Concluída', cls:'t-aprov'},
+  rejeitado:{label:'Prova Concluída', cls:'t-rej'}
 };
 function prioRank(p){ return p==='vermelho'?2:(p==='amarelo'?1:0); }
 function prioLabel(p){ return p==='vermelho'?'Urgente':(p==='amarelo'?'Prioritário':'Normal'); }
+/* Formata uma data/data-hora ISO (YYYY-MM-DD ou YYYY-MM-DDTHH:mm:ss...) como DD/MM/AAAA para leitura. */
+function formatarDataBR(iso){
+  if(!iso) return '—';
+  const d = iso.slice(0,10);
+  return `${d.slice(8,10)}/${d.slice(5,7)}/${d.slice(0,4)}`;
+}
 function escapeHtml(s){ return (s||'').toString().replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 function todosLotes(){ return Object.values(state.lotes).sort((a,b)=> prioRank(b.prioridade)-prioRank(a.prioridade) || (b.atualizadoEm||'').localeCompare(a.atualizadoEm||'')); }
 
@@ -677,12 +958,12 @@ function renderGradeLotes(){
     else if(l.prioridade==='amarelo') letraHtml = `<span class="quad-letra l-p">P</span>`;
     // distintivo Bartops (marca "B" da lista) — independente da prioridade
     const bartopsHtml = l.bartops ? `<span class="quad-bartops" title="Bartops">B</span>` : '';
-    // barra de estado (aberto sem barra / aguarda LAB / fechado) — mantém visível o estado do processo
-    let estadoClasse = '';
-    if(st==='tania') estadoClasse = 'e-tania';
-    else if(st==='aprovado') estadoClasse = 'e-aprovado';
-    else if(st==='rejeitado') estadoClasse = 'e-rejeitado';
-    const estadoHtml = estadoClasse ? `<span class="quad-estado-barra ${estadoClasse}"></span>` : '';
+    // estado escrito por extenso no próprio quadrado (não uma barra abstrata): PLANEADO = ninguém
+    // começou ainda · WIP = já há provador a trabalhar, mas ainda não concluiu. Um lote concluído
+    // nunca aparece aqui — sai logo desta grelha (ver lotesDeHoje) e passa a viver no Histórico.
+    const estadoClasse = l.provador1 ? 'e-wip' : 'e-planeado';
+    const estadoTxt = l.provador1 ? 'WIP' : 'Planeado';
+    const estadoHtml = `<span class="quad-estado-txt ${estadoClasse}">${estadoTxt}</span>`;
     const tituloEstado = STATUS_META[st]?STATUS_META[st].label:'';
     // importado hoje mas só pode ser cheirado a partir de amanhã (D+1) — mostra-se já, mas visualmente assinalado
     const bloqueado = loteBloqueadoAteAmanha(l);
@@ -841,42 +1122,16 @@ function importarOrdensExcel(input){
   });
 }
 document.getElementById('fileOrdens').addEventListener('change', function(){ importarOrdensExcel(this); });
-function renderLoteCard(l, comSelecao){
-  const status = computeStatus(l);
-  const divergeSet = calcularDivergenciaSet(l);
-  let flagsHtml = '';
-  if(status==='revisao_conjunta') flagsHtml = `<span class="flag flag-tania">Rever em conjunto · ${divergeSet.length} frasco(s)</span>`;
-  if(status==='aguarda_p3') flagsHtml = `<span class="flag flag-tania">Chamar Provador 3</span>`;
-  if(status==='tania'){
-    const uniao = uniaoTally(l);
-    flagsHtml = `<span class="flag flag-tania">Chamar LAB · ${uniao.total} defeito(s)</span>`;
-  }
-  if(status==='aguarda_fecho'){
-    flagsHtml = haAromas(l.registos.p1.itens) ? `<span class="flag flag-mismatch">Aromas confirmados</span>` : `<span class="flag flag-ok">Sem aromas</span>`;
-  }
-  if(l.decisao.final) flagsHtml = `<span class="flag ${l.decisao.final==='aprovado'?'flag-ok':'flag-mismatch'}">${l.decisao.final==='aprovado'?'Aprovado':'Rejeitado'}</span>`;
-  const num = escapeHtml(l.numeroLote);
-  const checkboxHtml = comSelecao ? `<input type="checkbox" class="lote-check" onclick="event.stopPropagation(); toggleSelecaoLote('${num}')" ${lotesSelecionados.has(l.numeroLote)?'checked':''}>` : '';
-  const onClickCard = comSelecao ? `toggleSelecaoLote('${num}')` : `openLoteDetail('${num}')`;
-  return `<div class="lote-card prio-${l.prioridade}${comSelecao && lotesSelecionados.has(l.numeroLote)?' selecionado':''}" onclick="${onClickCard}">
-    <div class="row1">
-      ${checkboxHtml}
-      <div class="lote-num">${num}</div>
-      <span class="badge badge-${l.prioridade}">${prioLabel(l.prioridade)}</span>
-    </div>
-    <div class="meta">${STATUS_META[status]?STATUS_META[status].label:''} · P1: ${escapeHtml(l.provador1)||'—'} · P2: ${escapeHtml(l.provador2)||'—'}</div>
-    <div class="flags">${flagsHtml}</div>
-  </div>`;
-}
-
 /* ==================== VIEW: PRIORIDADES ==================== */
 function toggleImportBox(){ document.getElementById('importBox').classList.toggle('hidden'); }
 function importarPrioridades(){
+  // Regra (11/09/2026): não se criam lotes novos por aqui — só pelo "Importar Ordens (Excel)".
+  // Esta caixa só serve para marcar prioridade/Bartops em lotes que já existem.
   const txt = document.getElementById('taPrioridadesInput').value;
   const linhas = txt.split('\n').map(l=>l.trim()).filter(Boolean);
   let n=0;
   let ultimoNum = null; // para o caso de a marca B/U vir numa linha à parte (tabelas coladas de email)
-  const naoImportados = []; // lotes da lista que ainda não existiam (não vieram do import Excel de Sensoriais)
+  const naoEncontrados = []; // lotes da lista que ainda não existem (não vieram do Importar Ordens) — não são criados
   linhas.forEach(linha=>{
     const m = linha.match(/[A-Z]{1,4}\d{4,}/i);
     if(m){
@@ -886,8 +1141,9 @@ function importarPrioridades(){
       const urgente = /\bU\b/i.test(resto) || /URGENTE/i.test(linha);
       const bartops = /\bB\b/i.test(resto) || /BARTOPS/i.test(linha);
       if(!state.lotes[num]){
-        state.lotes[num] = criarLoteVazio(num);
-        naoImportados.push(num); // criado agora, mas não confirmado como Sensorial pelo Excel — alerta no fim
+        naoEncontrados.push(num);
+        ultimoNum = null; // não aplicar as marcas B/U de linhas seguintes a um lote que não existe
+        return;
       }
       state.lotes[num].prioridade = urgente ? 'vermelho' : (state.lotes[num].prioridade==='vermelho' ? 'vermelho' : 'amarelo');
       if(bartops) state.lotes[num].bartops = true;
@@ -906,100 +1162,131 @@ function importarPrioridades(){
   saveState();
   document.getElementById('taPrioridadesInput').value='';
   let msg = n + ' lote(s) atualizado(s) com prioridade.';
-  if(naoImportados.length){
-    msg += `\n\nATENÇÃO: ${naoImportados.length} lote(s) desta lista ainda não tinham vindo do import Excel de Sensoriais e foram criados agora só com a prioridade — confirma com a logística se estes lotes têm mesmo amostra Sensorial:\n${naoImportados.join(', ')}`;
+  if(naoEncontrados.length){
+    msg += `\n\nATENÇÃO: ${naoEncontrados.length} lote(s) desta lista ainda não existem na app (não vieram do "Importar Ordens (Excel)") e por isso NÃO foram criados — confirma com a logística e importa o Excel primeiro:\n${naoEncontrados.join(', ')}`;
   }
   alert(msg);
   renderAll();
 }
-function renderListaPrioridades(){
-  const el = document.getElementById('listaPrioridades');
-  const lotes = todosLotes().filter(l=> !l.decisao.final);
-  el.innerHTML = lotes.length ? lotes.map(l=>renderLoteCard(l, modoSelecao)).join('') : `<div class="empty-note">Sem lotes em aberto.</div>`;
-  renderToolbarSelecao(lotes);
+/* ==================== LAB (3 colunas: Planeados / WIP / Concluídos + Histórico à parte) ====================
+   O LAB deixou de decidir (a decisão é automática) — passou a ver só o essencial: 3 colunas lado a
+   lado com o nº de cada lote (e a letra U/P quando o lote já tinha sido identificado como Urgente
+   ou Prioritário na importação). Sem colunas de Data/Prioridade por extenso/Provadores à vista —
+   essa informação vive dentro da ficha do lote, que se abre ao tocar no número. Concluídos mostra
+   os lotes decididos hoje; ao fim desse dia, o lote sai daqui e passa a viver no Histórico (arquivo
+   à parte, com mais detalhe e exportação CSV, para quem precisar de consultar o histórico completo). */
+function prioLetraLAB(p){ return p==='vermelho'?'U':(p==='amarelo'?'P':'Normal'); }
+function grupoLoteLAB(l){
+  if(l.decisao.final) return l.decisao.data===hojeStr() ? 'concluidos' : 'historico';
+  if(!l.provador1) return 'planeados';
+  return 'wip';
 }
-
-/* ==================== SELEÇÃO MÚLTIPLA / APAGAR EM MASSA (Lotes em Aberto) ==================== */
-let modoSelecao = false;
-let lotesSelecionados = new Set();
-function ativarModoSelecao(){
-  modoSelecao = true;
-  lotesSelecionados = new Set();
-  renderListaPrioridades();
+function letraPrioHtml(l){
+  return l.prioridade==='vermelho' ? '<span class="letra-prio l-u">U</span>' : (l.prioridade==='amarelo' ? '<span class="letra-prio l-p">P</span>' : '');
 }
-function desativarModoSelecao(){
-  modoSelecao = false;
-  lotesSelecionados = new Set();
-  renderListaPrioridades();
+function loteBadgeLAB(l){
+  return `<button type="button" class="lab-lote-btn" onclick="openLoteDetail('${escapeHtml(l.numeroLote)}')">${letraPrioHtml(l)}${escapeHtml(l.numeroLote)}</button>`;
 }
-function toggleSelecaoLote(numero){
-  if(lotesSelecionados.has(numero)) lotesSelecionados.delete(numero); else lotesSelecionados.add(numero);
-  renderListaPrioridades();
-}
-function renderToolbarSelecao(lotesVisiveis){
-  const el = document.getElementById('toolbarSelecao');
+function renderColunaLAB(elId, contId, lotes){
+  const cont = document.getElementById(contId);
+  if(cont) cont.textContent = lotes.length;
+  const el = document.getElementById(elId);
   if(!el) return;
-  if(!modoSelecao){
-    el.innerHTML = `<button class="btn btn-sm" id="btnAtivarSelecao" onclick="ativarModoSelecao()">Selecionar vários</button>`;
-    return;
+  el.innerHTML = lotes.length ? lotes.map(loteBadgeLAB).join('') : `<div class="empty-note" style="font-size:11px;padding:4px 0;">Sem lotes.</div>`;
+}
+function renderTabelaLAB(){
+  const todos = todosLotes();
+  renderColunaLAB('labColPlaneados', 'labContPlaneados', todos.filter(l=> grupoLoteLAB(l)==='planeados'));
+  renderColunaLAB('labColWip', 'labContWip', todos.filter(l=> grupoLoteLAB(l)==='wip'));
+  renderColunaLAB('labColConcluidos', 'labContConcluidos', todos.filter(l=> grupoLoteLAB(l)==='concluidos'));
+  if(historicoLABAberto) renderTabelaHistoricoLAB();
+}
+/* Selecionar/copiar os botões dos lotes à mão concatena tudo numa única célula do Excel (e ainda
+   mistura a letra U/P no meio do texto) — este botão copia só os nºs de lote, um por linha, para
+   colar direto numa coluna. Copia direto, sem popup a pedir para clicar OK — o próprio botão pisca
+   "Copiado" por instantes como confirmação. */
+function copiarColunaLAB(grupo, btn){
+  const lotes = todosLotes().filter(l=> grupoLoteLAB(l)===grupo);
+  if(!lotes.length){ if(btn) feedbackBotaoCopiar(btn, 'Sem lotes'); return; }
+  const texto = lotes.map(l=> l.numeroLote).join('\n');
+  copiarTextoParaClipboard(texto, ()=>{ if(btn) feedbackBotaoCopiar(btn, `Copiado (${lotes.length})`); });
+}
+function feedbackBotaoCopiar(btn, texto){
+  const original = btn.textContent;
+  btn.textContent = texto;
+  btn.disabled = true;
+  setTimeout(()=>{ btn.textContent = original; btn.disabled = false; }, 1400);
+}
+function copiarTextoParaClipboard(texto, aoConcluir){
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(texto).then(aoConcluir).catch(()=> copiarTextoFallback(texto, aoConcluir));
+  } else {
+    copiarTextoFallback(texto, aoConcluir);
   }
-  const n = lotesSelecionados.size;
-  el.innerHTML = `
-    <button class="btn btn-sm" onclick="selecionarTodosVisiveis()">Selecionar todos (${lotesVisiveis.length})</button>
-    <button class="btn btn-sm" style="border-color:var(--red);color:var(--red);" ${n?'':'disabled style="opacity:.5;"'} onclick="apagarSelecionados()">Apagar selecionados (${n})</button>
-    <button class="btn btn-sm" onclick="desativarModoSelecao()">Cancelar</button>`;
 }
-function selecionarTodosVisiveis(){
-  const lotes = todosLotes().filter(l=> !l.decisao.final);
-  lotesSelecionados = new Set(lotes.map(l=> l.numeroLote));
-  renderListaPrioridades();
+function copiarTextoFallback(texto, cb){
+  const ta = document.createElement('textarea');
+  ta.value = texto;
+  ta.style.position = 'fixed';
+  ta.style.opacity = '0';
+  document.body.appendChild(ta);
+  ta.focus();
+  ta.select();
+  try{ document.execCommand('copy'); }catch(e){}
+  document.body.removeChild(ta);
+  if(cb) cb();
 }
-function apagarSelecionados(){
-  const nums = [...lotesSelecionados];
-  if(!nums.length) return;
-  if(!confirm(`Apagar ${nums.length} lote(s) selecionado(s) definitivamente? Isto remove-os para todos os utilizadores.`)) return;
-  nums.forEach(num=>{
-    delete state.lotes[num];
-    fetch('/api/lotes/'+encodeURIComponent(num), {method:'DELETE'}).catch(()=>{});
-  });
-  guardarLocal();
-  desativarModoSelecao();
-  renderAll();
+let historicoLABAberto = false;
+function toggleHistoricoLAB(){
+  historicoLABAberto = !historicoLABAberto;
+  document.getElementById('blocoHistoricoLAB').classList.toggle('hidden', !historicoLABAberto);
+  document.getElementById('btnToggleHistoricoLAB').textContent = historicoLABAberto ? 'Ocultar Histórico de Conclusões' : 'Ver Histórico de Conclusões';
+  if(historicoLABAberto) renderTabelaHistoricoLAB();
 }
-
-/* ==================== HISTÓRICO (lotes já aprovados/rejeitados) ==================== */
-let filtroHistorico = 'todos';
-function filtrarHistorico(f){
-  filtroHistorico = f;
-  document.querySelectorAll('.hist-filtro').forEach(b=> b.classList.toggle('on', b.dataset.f===f));
-  renderListaHistorico();
-}
-function renderListaHistorico(){
-  const el = document.getElementById('listaHistorico');
-  let lotes = todosLotes().filter(l=> !!l.decisao.final);
-  if(filtroHistorico!=='todos') lotes = lotes.filter(l=> l.decisao.final===filtroHistorico);
+function linhasHistoricoLAB(){
+  const lotes = todosLotes().filter(l=> grupoLoteLAB(l)==='historico');
   lotes.sort((a,b)=> (b.decisao.data||'').localeCompare(a.decisao.data||''));
-  el.innerHTML = lotes.length ? lotes.map(l=>renderLoteCard(l)).join('') : `<div class="empty-note">Ainda sem lotes aprovados ou rejeitados.</div>`;
+  return lotes;
 }
-function exportarHistoricoCsv(){
-  let lotes = todosLotes().filter(l=> !!l.decisao.final);
-  if(filtroHistorico!=='todos') lotes = lotes.filter(l=> l.decisao.final===filtroHistorico);
-  lotes.sort((a,b)=> (b.decisao.data||'').localeCompare(a.decisao.data||''));
-  if(!lotes.length){ alert('Não há lotes no histórico para exportar (com este filtro).'); return; }
-  const header = ['Nº Lote','Prioridade','Bartops','Estado Final','Data Decisão','Provador 1','Provador 2','Provador 3','TCA','Mofo','Outros','Decidido/Avaliado por','Motivo Escalada','Comentários'];
-  const rows = lotes.map(l=>{
-    const t = uniaoTally(l);
-    return [l.numeroLote, prioLabel(l.prioridade), l.bartops?'Sim':'', l.decisao.final==='aprovado'?'Aprovado':'Rejeitado', l.decisao.data||'',
-      l.provador1, l.provador2, l.provador3||'', t.tca, t.mofo, t.outros, l.decisao.decididoPor||l.decisao.supervisorResponsavel||'', l.decisao.motivoEscalamento||'', l.decisao.comentarios||''];
-  });
+/* Linhas compactas que expandem ao tocar (em vez de tabela larga com scroll horizontal) — mostra-se
+   logo Data · Nº Lote · letra U/P, e só ao abrir é que aparecem os provadores e o resto. */
+function renderTabelaHistoricoLAB(){
+  const el = document.getElementById('tabelaLAB');
+  if(!el) return;
+  const lotes = linhasHistoricoLAB();
+  if(!lotes.length){ el.innerHTML = `<div class="empty-note">Ainda sem lotes no histórico.</div>`; return; }
+  el.innerHTML = lotes.map(l=> `<details class="hist-row">
+      <summary>
+        <span class="hr-data">${l.decisao.data||'—'}</span>
+        <span class="hr-lote">${escapeHtml(l.numeroLote)}</span>
+        ${letraPrioHtml(l)}
+      </summary>
+      <div class="hist-row-detalhe">
+        <div><strong>Provador 1:</strong> ${escapeHtml(l.provador1||'—')}</div>
+        <div><strong>Provador 2:</strong> ${escapeHtml(l.provador2||'—')}</div>
+        <div><strong>Provador 3:</strong> ${escapeHtml(l.provador3||'—')}</div>
+        <div><strong>Estado:</strong> Prova Concluída</div>
+        ${l.bartops?'<div>● Bartops</div>':''}
+        <div class="tabela-scroll" style="margin-top:4px;">${htmlTabelaFrascosLote(l)}</div>
+      </div>
+    </details>`).join('');
+}
+function exportarTabelaLABCsv(){
+  const lotes = linhasHistoricoLAB();
+  if(!lotes.length){ alert('Não há lotes no histórico para exportar.'); return; }
+  const header = ['Data','Nº Lote','Prioridade','Bartops','Provador 1','Provador 2','Provador 3','Estado','Frascos com Aroma'];
+  const rows = lotes.map(l=> [l.decisao.data||'', l.numeroLote, prioLetraLAB(l.prioridade), l.bartops?'Sim':'', l.provador1||'', l.provador2||'', l.provador3||'', 'Prova Concluída', textoFrascosLoteCsv(l)]);
   const csv = [header, ...rows].map(r=> r.map(v=>`"${String(v??'').replace(/"/g,'""')}"`).join(';')).join('\n');
   const blob = new Blob(['﻿'+csv], {type:'text/csv;charset=utf-8;'});
   const url = URL.createObjectURL(blob);
-  const sufixo = filtroHistorico==='todos' ? 'todos' : filtroHistorico;
-  const a = document.createElement('a'); a.href = url; a.download = `historico_prova_sensorial_${sufixo}_${new Date().toISOString().slice(0,10)}.csv`; a.click(); URL.revokeObjectURL(url);
+  const a = document.createElement('a'); a.href = url; a.download = `lab_historico_${new Date().toISOString().slice(0,10)}.csv`; a.click(); URL.revokeObjectURL(url);
 }
 
-/* ==================== LEVANTAMENTO (Logística — recolha de material após lotes rejeitados) ==================== */
+/* ==================== LEVANTAMENTO (Logística — recolha de material após lotes rejeitados) ====================
+   14/09/2026: simplificado a pedido da Joana — só o essencial e imediato para quem vai recolher o
+   material. "Por levantar (hoje)" mostra só os rejeitados de HOJE (l.decisao.data), por isso limpa-se
+   sozinho todos os dias — passado esse dia, o lote sai daqui e passa a viver só no separador
+   "Histórico" (sem esse filtro de data), para quem precisar de consultar para trás. */
 let filtroLevantamento = 'pendentes';
 function filtrarLevantamento(f){
   filtroLevantamento = f;
@@ -1011,81 +1298,77 @@ function frascosAssinaladosDe(l){
 }
 function renderLevantamentoCard(l){
   const num = escapeHtml(l.numeroLote);
+  // mesmo bloco colorido por prioridade usado na grelha de Lotes (q-prio-normal/prioritario/urgente)
+  const grupoPrio = l.prioridade==='vermelho' ? 'urgente' : (l.prioridade==='amarelo' ? 'prioritario' : 'normal');
   const frascos = frascosAssinaladosDe(l);
-  const frascosHtml = frascos.length
-    ? frascos.map(f=> `<div class="item-row"><div class="fn">Frasco ${f.frasco}</div><div class="tags">${f.tipoLabel}</div></div>`).join('')
-    : `<div class="empty-note" style="padding:4px 0;">Nenhum frasco individual assinalado — confirmar nas observações se é o lote inteiro que está contaminado.</div>`;
+  // nº efetivo dos frascos a levantar (ex: "6, 15") — 0 quando nenhum frasco foi assinalado
+  // individualmente (confirmar nesse caso pelas observações se é o lote inteiro).
+  const frascosTxt = frascos.length ? frascos.map(f=> f.frasco).join(', ') : '0';
   const temP3Fechado = l.registos.p3 && l.registos.p3.concluido;
-  const nProvadoresTxt = temP3Fechado ? '3 (P1 + P2 + Provador 3)' : '2 (P1 + P2)';
   const obs = [];
   if(l.registos.p1.observacoes) obs.push(`<div><strong>Provador 1:</strong> ${escapeHtml(l.registos.p1.observacoes)}</div>`);
   if(l.registos.p2.observacoes) obs.push(`<div><strong>Provador 2:</strong> ${escapeHtml(l.registos.p2.observacoes)}</div>`);
   if(temP3Fechado && l.registos.p3.observacoes) obs.push(`<div><strong>Provador 3:</strong> ${escapeHtml(l.registos.p3.observacoes)}</div>`);
-  if(l.registos.tania.observacoes) obs.push(`<div><strong>LAB:</strong> ${escapeHtml(l.registos.tania.observacoes)}</div>`);
-  if(l.decisao.comentarios && !obs.length) obs.push(`<div><strong>Comentários:</strong> ${escapeHtml(l.decisao.comentarios)}</div>`);
+  // (o comentário da decisão automática — "rejeição automática" — deixou de aparecer aqui a pedido)
   const obsHtml = obs.length ? obs.join('') : '<div class="empty-note" style="padding:4px 0;">Sem observações registadas.</div>';
-  const apr1 = l.registos.p1.apreciacao==='limpo'?'Limpo':(l.registos.p1.apreciacao==='pouco_limpo'?'Pouco Limpo':'—');
-  const apr2 = l.registos.p2.apreciacao==='limpo'?'Limpo':(l.registos.p2.apreciacao==='pouco_limpo'?'Pouco Limpo':'—');
-  const levantado = !!l.levantamentoConcluido;
-  return `<div class="lote-card prio-${l.prioridade}" style="${levantado?'opacity:.6;':''}">
-    <div class="row1">
-      <div class="lote-num">${num}</div>
-      <span class="flag flag-mismatch">Rejeitado</span>
-    </div>
-    <div class="meta">P1: ${escapeHtml(l.provador1)||'—'} · P2: ${escapeHtml(l.provador2)||'—'} · Nº provadores: ${nProvadoresTxt}</div>
-    <fieldset style="margin-top:8px;">
-      <legend>Frascos assinalados (${frascos.length} de ${l.numeroFrascos||'—'})</legend>
-      <div class="itens-list">${frascosHtml}</div>
-    </fieldset>
-    <fieldset style="margin-top:8px;">
-      <legend>Apreciação Geral</legend>
-      <div class="meta">P1: <strong>${apr1}</strong> · P2: <strong>${apr2}</strong></div>
-    </fieldset>
+  return `<div class="lote-card prio-${l.prioridade}">
+    <button type="button" class="quad-lote lev-tile q-prio-${grupoPrio}" onclick="openLoteDetail('${num}')">${num}</button>
+    <div class="frascos-levantar"><span class="fl-label">Frascos a levantar</span><span class="fl-num">${frascosTxt}</span></div>
     <fieldset style="margin-top:8px;">
       <legend>Observações</legend>
       ${obsHtml}
       ${l.decisao.motivoEscalamento?`<div style="margin-top:4px;"><strong>Motivo escalada:</strong> ${escapeHtml(l.decisao.motivoEscalamento)}</div>`:''}
     </fieldset>
-    <label style="display:flex;align-items:center;gap:8px;margin-top:10px;font-size:13px;font-weight:700;">
-      <input type="checkbox" ${levantado?'checked':''} onclick="toggleLevantamento('${num}')"> Material levantado${levantado && l.levantamentoData ? ' — '+new Date(l.levantamentoData).toLocaleString('pt-PT') : ''}
-    </label>
   </div>`;
 }
 function renderListaLevantamento(){
   const el = document.getElementById('listaLevantamento');
   let lotes = todosLotes().filter(l=> l.decisao.final==='rejeitado');
-  if(filtroLevantamento==='pendentes') lotes = lotes.filter(l=> !l.levantamentoConcluido);
+  if(filtroLevantamento==='pendentes') lotes = lotes.filter(l=> (l.decisao.data||'').slice(0,10) === hojeStr());
   lotes.sort((a,b)=> (b.decisao.data||'').localeCompare(a.decisao.data||''));
-  el.innerHTML = lotes.length ? lotes.map(renderLevantamentoCard).join('') : `<div class="empty-note">${filtroLevantamento==='pendentes' ? 'Sem material por levantar.' : 'Ainda sem lotes rejeitados.'}</div>`;
-}
-function toggleLevantamento(numero){
-  const lote = state.lotes[numero];
-  if(!lote) return;
-  lote.levantamentoConcluido = !lote.levantamentoConcluido;
-  lote.levantamentoData = lote.levantamentoConcluido ? new Date().toISOString() : '';
-  lote.atualizadoEm = new Date().toISOString();
-  saveState();
-  renderListaLevantamento();
+  el.innerHTML = lotes.length ? lotes.map(renderLevantamentoCard).join('') : `<div class="empty-note">${filtroLevantamento==='pendentes' ? 'Sem lotes rejeitados hoje.' : 'Ainda sem lotes no histórico.'}</div>`;
 }
 
 /* ==================== NAV ==================== */
 function switchView(v){
+  // 'levantamento' é agora o ecrã único "Logística": Importar Prioridades + Levantamento de Material.
   document.getElementById('view-inicio').classList.toggle('hidden', v!=='inicio');
-  document.getElementById('view-prioridades').classList.toggle('hidden', v!=='prioridades');
-  document.getElementById('view-historico').classList.toggle('hidden', v!=='historico');
+  document.getElementById('view-lab').classList.toggle('hidden', v!=='lab');
   document.getElementById('view-levantamento').classList.toggle('hidden', v!=='levantamento');
   document.getElementById('navInicio').classList.toggle('active', v==='inicio');
-  document.getElementById('navPrioridades').classList.toggle('active', v==='prioridades');
-  document.getElementById('navHistorico').classList.toggle('active', v==='historico');
+  document.getElementById('navLab').classList.toggle('active', v==='lab');
   document.getElementById('navLevantamento').classList.toggle('active', v==='levantamento');
-  if(v==='prioridades') renderListaPrioridades();
-  if(v==='historico') renderListaHistorico();
+  if(v==='lab') renderTabelaLAB();
   if(v==='levantamento') renderListaLevantamento();
 }
+function autoFinalizarPendentes(){
+  // rede de segurança: lotes que já reúnem tudo o que é preciso para decidir sozinhos (0 a 3 frascos
+  // com TCA/Mofo, sem Mofo Forte) mas que por alguma razão ainda não foram fechados — cobre também
+  // lotes antigos que ficaram parados à espera do LAB antes desta regra existir.
+  let alterou = false;
+  Object.keys(state.lotes).forEach(numero=>{
+    if(tentarAutoFinalizar(numero)) alterou = true;
+  });
+  if(alterou) saveState();
+}
+function atualizarBadgeP3(){
+  // aviso dentro da app (sem email) quando é preciso chamar o 3º provador — seja por divergência
+  // de conjunto entre P1/P2, seja por já ir em 4+ frascos com TCA/Mofo ou Mofo Forte.
+  const badge = document.getElementById('badgeP3');
+  if(!badge) return;
+  const n = todosLotes().filter(l=>{
+    const st = computeStatus(l);
+    return st==='aguarda_p3';
+  }).length;
+  badge.textContent = n>9 ? '9+' : String(n);
+  badge.classList.toggle('hidden', n===0);
+}
 function renderAll(){
+  autoFinalizarPendentes();
+  atualizarBadgeP3();
   renderGradeLotes();
-  if(!document.getElementById('view-prioridades').classList.contains('hidden')) renderListaPrioridades();
-  if(!document.getElementById('view-historico').classList.contains('hidden')) renderListaHistorico();
+  if(!document.getElementById('view-levantamento').classList.contains('hidden')) renderListaLevantamento();
+  if(!document.getElementById('view-lab').classList.contains('hidden')) renderTabelaLAB();
 }
 
 /* ==================== LEITOR DE CÓDIGO DE BARRAS (câmara do telemóvel) ==================== */
@@ -1275,63 +1558,82 @@ function openLoteDetail(numero){
 
   let corpoExtra = '';
 
-  // Ficha base + foto etiqueta
+  // Ficha base + foto etiqueta (Nº Frascos vem só do Excel — deixou de ser editável à mão)
   corpoExtra += `
   <fieldset>
     <legend>Identificação do Lote</legend>
     <div class="two-col">
-      <div class="field"><label>Prioridade</label>
-        <select onchange="alterarPrioridade('${numero}', this.value)">
-          <option value="normal" ${lote.prioridade==='normal'?'selected':''}>Normal</option>
-          <option value="amarelo" ${lote.prioridade==='amarelo'?'selected':''}>Prioritário</option>
-          <option value="vermelho" ${lote.prioridade==='vermelho'?'selected':''}>Urgente</option>
-        </select>
-      </div>
-      <div class="field"><label>Nº Frascos</label><input type="number" value="${lote.numeroFrascos}" onchange="alterarCampo('${numero}','numeroFrascos', parseInt(this.value)||50)"></div>
+      <div class="field"><label>Prioridade</label><div class="empty-note" style="text-align:left;padding:8px 0 0;">${prioLabel(lote.prioridade)} <span style="opacity:.7;">(definida na importação — não editável)</span></div></div>
+      <div class="field"><label>Nº Frascos</label><div class="empty-note" style="text-align:left;padding:8px 0 0;">${lote.numeroFrascos} <span style="opacity:.7;">(vem do Excel — não editável)</span></div></div>
     </div>
     ${lote.bartops ? `<div class="empty-note" style="text-align:left;padding:2px 0 11px;font-weight:700;color:var(--bartops);">● Bartops — informação vinda da lista de prioridades (só leitura)</div>` : ''}
-    <div class="two-col">
-      <div class="field"><label>Provador 1</label>
-        <select onchange="alterarCampo('${numero}','provador1', this.value)" ${lote.registos.p1.concluido?'disabled':''}>${opcoesProvadores(lote.provador1)}</select>
-        ${lote.registos.p1.concluido?'<div class="empty-note" style="padding:2px 0;">Já assinou — não pode ser alterado</div>':''}
-      </div>
-      <div class="field"><label>Provador 2</label>
-        <select onchange="alterarCampo('${numero}','provador2', this.value)" ${(!lote.registos.p1.concluido || lote.registos.p2.concluido)?'disabled':''}>${opcoesProvadores(lote.provador2)}</select>
-        ${!lote.registos.p1.concluido?'<div class="empty-note" style="padding:2px 0;">Aguarda o Provador 1 concluir</div>':(lote.registos.p2.concluido?'<div class="empty-note" style="padding:2px 0;">Já assinou — não pode ser alterado</div>':'')}
-      </div>
+    <div class="two-col" style="margin-top:2px;">
+      <div class="field"><label>Data Planeamento</label><div class="empty-note" style="text-align:left;padding:8px 0 0;">${formatarDataBR(lote.criadoEm)}</div></div>
+      <div class="field"><label>Data Abertura da Prova</label><div class="empty-note" style="text-align:left;padding:8px 0 0;">${formatarDataBR(lote.provaAbertaEm)}</div></div>
     </div>
-    ${mostrarP3 ? `<div class="two-col"><div class="field"><label>Provador 3</label>
-        <select onchange="alterarCampo('${numero}','provador3', this.value)" ${lote.registos.p3.concluido?'disabled':''}>${opcoesProvadores(lote.provador3)}</select>
-        ${lote.registos.p3.concluido?'<div class="empty-note" style="padding:2px 0;">Já assinou — não pode ser alterado</div>':''}
-      </div><div></div></div>` : ''}
-    <div class="field"><label>Foto da Etiqueta</label>
-      <div class="photo-box" id="photoBox">
-        ${lote.fotoEtiqueta ? `<img src="${lote.fotoEtiqueta}" onclick="verFotoCheia('${numero}')">` : `<div class="empty-note" style="padding:6px 0;">Sem foto guardada</div>`}
-        <label class="btn btn-sm">${lote.fotoEtiqueta?'Substituir foto':'Tirar / carregar foto'}
-          <input type="file" accept="image/*" capture="environment" class="hidden" onchange="carregarFoto('${numero}', this)">
-        </label>
-      </div>
-    </div>
+    ${lote.decisao.final ? `<div class="field" style="margin-top:10px;"><label>Data Conclusão</label><div class="empty-note" style="text-align:left;padding:8px 0 0;">${formatarDataBR(lote.decisao.data)}</div></div>` : ''}
   </fieldset>`;
 
-  // Registos
+  // Registos — o provador já não escolhe "sou o 1 ou o 2": escolhe só o nome, a app decide o lugar.
   // Enquanto o Provador 2 não conclui, o registo do Provador 1 fica bloqueado para consulta —
   // mantém a prova cega/independente (ninguém vê o resultado do outro antes de terminar o seu).
   const p1VerBloqueado = lote.registos.p1.concluido && !lote.registos.p2.concluido;
   const aindaNaoDisponivel = loteBloqueadoAteAmanha(lote);
-  const p1Bloq = p1VerBloqueado || aindaNaoDisponivel;
-  const p2Bloq = !lote.registos.p1.concluido || aindaNaoDisponivel;
+  const slotSeguinte = proximoSlotProva(lote);
+  const faltamMin = slotSeguinte ? tempoEsperaProvador(lote, slotSeguinte) : 0;
+
+  let resumoProvasHtml = `<div class="empty-note" style="text-align:left;padding:2px 0;">Provador 1: ${lote.registos.p1.concluido? escapeHtml(lote.provador1)+' — concluído' : '—'}</div>`;
+  resumoProvasHtml += `<div class="empty-note" style="text-align:left;padding:2px 0;">Provador 2: ${lote.registos.p2.concluido? escapeHtml(lote.provador2)+' — concluído' : '—'}</div>`;
+  if(mostrarP3) resumoProvasHtml += `<div class="empty-note" style="text-align:left;padding:2px 0;">Provador 3: ${lote.registos.p3.concluido? escapeHtml(lote.provador3)+' — concluído' : '—'}</div>`;
+
+  let verBotoesHtml = '';
+  if((lote.registos.p1.concluido && !p1VerBloqueado) || lote.registos.p2.concluido || (mostrarP3 && lote.registos.p3.concluido)){
+    verBotoesHtml = '<div class="actions-row">';
+    if(lote.registos.p1.concluido && !p1VerBloqueado) verBotoesHtml += `<button class="btn btn-sm" onclick="openRegistoModal('${numero}','p1')">Ver Provador 1</button>`;
+    if(lote.registos.p2.concluido) verBotoesHtml += `<button class="btn btn-sm" onclick="openRegistoModal('${numero}','p2')">Ver Provador 2</button>`;
+    if(mostrarP3 && lote.registos.p3.concluido) verBotoesHtml += `<button class="btn btn-sm" onclick="openRegistoModal('${numero}','p3')">Ver Provador 3</button>`;
+    verBotoesHtml += '</div>';
+  }
+
+  let entradaHtml = '';
+  if(aindaNaoDisponivel){
+    entradaHtml = `<div class="empty-note" style="padding:0 0 8px;font-weight:700;color:var(--yellow);">● Importado hoje — só pode ser cheirado a partir de ${lote.diaPrevisto.slice(8,10)}/${lote.diaPrevisto.slice(5,7)}/${lote.diaPrevisto.slice(0,4)}.</div>`;
+  } else if(slotSeguinte && faltamMin>0){
+    entradaHtml = `<div class="empty-note" style="padding:6px 0;">Aguarda mais ${faltamMin} minuto(s) — mínimo de 30 min entre provadores, para não perder o foco olfativo.</div>`;
+  } else if(slotSeguinte){
+    const nomeCampoSeg = nomeCampoSlot(slotSeguinte);
+    const provaEmCurso = lote[nomeCampoSeg] && !lote.registos[slotSeguinte].concluido;
+    entradaHtml = `<button class="btn btn-primary btn-block" onclick="abrirEntradaProvador('${numero}')">${provaEmCurso?`Continuar Prova — ${escapeHtml(lote[nomeCampoSeg])}`:'Iniciar Prova'}</button>`;
+    // Prova em curso (guardada com "Fechar sem concluir"): "Prova nova" recomeça este lugar do
+    // zero (apaga o que já estava registado e volta a perguntar quem vai fazer a prova), para um
+    // provador diferente poder pegar na prova sem que isso seja tratado como uma assinatura.
+    if(provaEmCurso){
+      entradaHtml += `
+      <div class="actions-row" style="margin-top:8px;">
+        <button class="btn btn-sm btn-block" onclick="provaNovaProvador('${numero}','${slotSeguinte}')">Prova nova</button>
+      </div>`;
+    }
+  }
+
   corpoExtra += `
   <fieldset>
     <legend>Registos por Provador</legend>
-    ${aindaNaoDisponivel?`<div class="empty-note" style="padding:0 0 8px;font-weight:700;color:var(--yellow);">● Importado hoje — só pode ser cheirado a partir de ${lote.diaPrevisto.slice(8,10)}/${lote.diaPrevisto.slice(5,7)}/${lote.diaPrevisto.slice(0,4)}.</div>`:''}
-    <div class="actions-row">
-      <button class="btn ${lote.registos.p1.concluido?'':'btn-primary'}" ${p1Bloq?'disabled style="opacity:.5;"':''} onclick="${p1Bloq?'':`openRegistoModal('${numero}','p1')`}">Provador 1 ${lote.registos.p1.concluido?(p1VerBloqueado?'(bloqueado)':'(ver)'):''}</button>
-      <button class="btn ${lote.registos.p2.concluido?'':'btn-primary'}" ${p2Bloq?'disabled style="opacity:.5;"':''} onclick="${p2Bloq?'':`openRegistoModal('${numero}','p2')`}">Provador 2 ${lote.registos.p2.concluido?'(ver)':''}</button>
-      ${mostrarP3?`<button class="btn ${lote.registos.p3.concluido?'':'btn-primary'}" onclick="openRegistoModal('${numero}','p3')">Provador 3 ${lote.registos.p3.concluido?'(ver)':''}</button>`:''}
-    </div>
+    ${resumoProvasHtml}
+    ${verBotoesHtml}
+    ${entradaHtml}
     ${p1VerBloqueado?'<div class="empty-note" style="padding:6px 0 0;">O registo do Provador 1 só fica visível depois do Provador 2 concluir — mantém a prova cega.</div>':''}
   </fieldset>`;
+
+  // Tabela de comparação por frasco — quais frascos têm aroma e o que cada provador encontrou
+  // (não só a contagem por categoria). Só aparece depois de P1 e P2 concluírem os dois, para nunca
+  // revelar dados de um provador ainda a meio do registo nem quebrar a prova cega.
+  if(lote.registos.p1.concluido && lote.registos.p2.concluido && framesUniaoLote(lote).length){
+    corpoExtra += `
+    <fieldset>
+      <legend>Frascos com Aroma</legend>
+      <div class="tabela-scroll">${htmlTabelaFrascosLote(lote)}</div>
+    </fieldset>`;
+  }
 
   // Comparação / decisão
   if(status==='revisao_conjunta'){
@@ -1342,41 +1644,28 @@ function openLoteDetail(numero){
       <button class="btn btn-primary btn-block" onclick="openRevisaoConjuntaModal('${numero}')">Abrir Revisão Conjunta</button>
     </fieldset>`;
   } else if(status==='aguarda_p3'){
+    const det = uniaoTallyDetalhada(lote);
+    const motivoTxt = divergeSet.length
+      ? `Frasco(s) ${divergeSet.join(', ')} continuam a divergir depois da Revisão Conjunta.`
+      : `${det.contaveis} frasco(s) com TCA/Mofo${det.mofoForte?' (inclui Mofo Forte)':''} — vai direto para o 3º provador desempatar.`;
     corpoExtra += `
     <fieldset>
-      <legend>Divergência mantida após Revisão Conjunta</legend>
-      <div class="empty-note" style="color:var(--red);padding:6px 0;">Frasco(s) ${divergeSet.join(', ')} continuam a divergir. É necessário chamar o Provador 3 (usa o botão "Provador 3" acima).</div>
-    </fieldset>`;
-  } else if(status==='tania'){
-    const uniao = uniaoTally(lote);
-    const origem = lote.registos.p3.concluido ? 'Houve cruzamento com o Provador 3.' : 'Provador 1 e Provador 2 concordam nos frascos assinalados.';
-    corpoExtra += `
-    <fieldset>
-      <legend>Pronto para o LAB decidir</legend>
-      <div class="empty-note" style="padding:6px 0;">${origem} Total de ${uniao.total} frasco(s) com defeito (TCA ${uniao.tca} · Mofo ${uniao.mofo} · Outros ${uniao.outros}).</div>
-      <button class="btn btn-primary btn-block" onclick="openTaniaModal('${numero}')">Chamar LAB · Avaliar Lote</button>
-    </fieldset>`;
-  } else if(status==='aguarda_fecho'){
-    corpoExtra += `
-    <fieldset>
-      <legend>Fecho do Lote</legend>
-      <div class="suggest-banner apr">Provador 1 e Provador 2 coincidem, sem qualquer aroma assinalado — lote sugerido APROVADO.</div>
-      <div class="field"><label>Nome de quem fecha o lote (QC)</label><select id="fQC">${opcoesProvadores(lote.decisao.decididoPor || lote.provador2)}</select></div>
-      <div class="field"><label>Comentários</label><textarea id="fComentarios">${escapeHtml(lote.decisao.comentarios)}</textarea></div>
-      <div class="actions-row">
-        <button class="btn btn-approve" onclick="decidirLote('${numero}','aprovado')">Aprovar</button>
-        <button class="btn btn-reject" onclick="decidirLote('${numero}','rejeitado')">Rejeitar</button>
+      <legend>É preciso o 3º Provador</legend>
+      <div class="empty-note" style="color:var(--red);padding:6px 0;">${motivoTxt} O LAB não participa — o 3º provador regista a prova normalmente (usa "Iniciar Prova" acima) e assim que assinar, o lote fica logo concluído.</div>
+      <div class="tally">
+        <div class="box"><div class="n">${det.tcaForte}</div><div class="lbl">TCA Forte</div></div>
+        <div class="box"><div class="n">${det.tcaPercetivel}</div><div class="lbl">TCA Percet.</div></div>
+        <div class="box"><div class="n">${det.mofoForte}</div><div class="lbl">Mofo Forte</div></div>
+        <div class="box"><div class="n">${det.mofoPercetivel}</div><div class="lbl">Mofo Percet.</div></div>
+        <div class="box"><div class="n">${det.outros}</div><div class="lbl">Outros Aromas</div></div>
       </div>
     </fieldset>`;
   } else if(lote.decisao.final){
     corpoExtra += `
     <fieldset>
-      <legend>Decisão Registada</legend>
+      <legend>Prova Concluída</legend>
       <div class="empty-note" style="padding:4px 0;">
-        <strong style="color:${lote.decisao.final==='aprovado'?'var(--green)':'var(--red)'};">${lote.decisao.final==='aprovado'?'APROVADO':'REJEITADO'}</strong>
-        por ${escapeHtml(lote.decisao.decididoPor||lote.decisao.supervisorResponsavel)} em ${lote.decisao.data}<br>
-        ${lote.decisao.supervisorResponsavel ? `Avaliado por: ${escapeHtml(lote.decisao.supervisorResponsavel)} (LAB)<br>Motivo: ${escapeHtml(lote.decisao.motivoEscalamento)}<br>` : ''}
-        ${lote.decisao.comentarios ? `Comentários: ${escapeHtml(lote.decisao.comentarios)}` : ''}
+        <strong>PROVA CONCLUÍDA</strong>
       </div>
     </fieldset>`;
   }
@@ -1389,13 +1678,11 @@ function openLoteDetail(numero){
       <div class="sub">Estado atual: <strong>${STATUS_META[status]?STATUS_META[status].label:status}</strong></div>
       ${corpoExtra}
       <div class="actions-row">
-        <button class="btn" style="border-color:var(--red);color:var(--red);" onclick="apagarLote('${numero}')">Apagar Registo</button>
         <button class="btn" onclick="closeModal('overlayLote')">Fechar</button>
       </div>
     </div>
   </div>`;
 }
-function alterarPrioridade(numero, val){ state.lotes[numero].prioridade = val; state.lotes[numero].atualizadoEm = new Date().toISOString(); saveState(); renderAll(); openLoteDetail(numero); }
 function alterarCampo(numero, campo, val){ state.lotes[numero][campo] = val; state.lotes[numero].atualizadoEm = new Date().toISOString(); saveState(); renderAll(); }
 function apagarLote(numero){
   if(!confirm('Apagar este registo definitivamente? Isto remove-o para todos os utilizadores.')) return;
@@ -1404,56 +1691,110 @@ function apagarLote(numero){
   fetch('/api/lotes/'+encodeURIComponent(numero), {method:'DELETE'}).catch(()=>{});
   closeModal('overlayLote'); renderAll();
 }
-function decidirLote(numero, final){
+/* ==================== ENTRADA DO PROVADOR (a app decide sozinha se é a 1ª, 2ª ou 3ª prova) ====================
+   O provador já não escolhe "sou o Provador 1" ou "sou o Provador 2": escolhe só o nome. A app olha
+   para o que já está feito neste lote e decide automaticamente qual é o lugar seguinte. Também impede
+   que o mesmo nome repita no mesmo lote, e exige pelo menos 30 minutos desde a assinatura anterior. */
+function proximoSlotProva(lote){
+  if(loteBloqueadoAteAmanha(lote)) return null;
+  if(lote.decisao.final) return null;
+  if(!lote.registos.p1.concluido) return 'p1';
+  if(!lote.registos.p2.concluido) return 'p2';
+  if(computeStatus(lote)==='aguarda_p3' && !lote.registos.p3.concluido) return 'p3';
+  return null;
+}
+function nomeCampoSlot(slot){ return slot==='p1'?'provador1':(slot==='p2'?'provador2':'provador3'); }
+function nomesJaUsados(lote, slot){
+  const usados = [];
+  if(slot!=='p1' && lote.provador1) usados.push(lote.provador1);
+  if(slot!=='p2' && lote.provador2) usados.push(lote.provador2);
+  if(slot!=='p3' && lote.provador3) usados.push(lote.provador3);
+  return usados;
+}
+// Minutos mínimos exigidos entre provadores. Reposto a 30 (14/09/2026) para a publicação em Railway.
+const MINUTOS_ESPERA_ENTRE_PROVADORES = 30;
+function tempoEsperaProvador(lote, slot){
+  const TRINTA_MIN = MINUTOS_ESPERA_ENTRE_PROVADORES*60*1000;
+  let assinaturaAnterior = null;
+  if(slot==='p2') assinaturaAnterior = lote.registos.p1.assinadoEm || null;
+  if(slot==='p3'){
+    const t1 = lote.registos.p1.assinadoEm ? new Date(lote.registos.p1.assinadoEm).getTime() : 0;
+    const t2 = lote.registos.p2.assinadoEm ? new Date(lote.registos.p2.assinadoEm).getTime() : 0;
+    assinaturaAnterior = (t1>=t2 ? lote.registos.p1.assinadoEm : lote.registos.p2.assinadoEm) || null;
+  }
+  if(!assinaturaAnterior) return 0;
+  const passouMs = Date.now() - new Date(assinaturaAnterior).getTime();
+  return Math.max(0, Math.ceil((TRINTA_MIN - passouMs) / 60000));
+}
+/* "Prova nova": recomeça esta prova por completo neste lugar — apaga o que já estava registado e
+   volta a pedir o nome, para que outra pessoa possa pegar na prova (ex: Joana → Ana Catarina) sem
+   que isso seja tratado como uma assinatura/conclusão. */
+function provaNovaProvador(numero, slot){
+  if(!confirm('Isto reinicia esta prova por completo neste lugar: apaga os dados já registados e volta a perguntar quem vai fazer a prova. Confirmas?')) return;
   const lote = state.lotes[numero];
-  lote.decisao.final = final;
-  lote.decisao.comentarios = document.getElementById('fComentarios').value.trim();
-  lote.decisao.decididoPor = document.getElementById('fQC').value.trim();
-  lote.decisao.data = new Date().toISOString().slice(0,10);
+  const reg = lote.registos[slot];
+  reg.itens = [];
+  reg.apreciacao = '';
+  reg.observacoes = '';
+  lote[nomeCampoSlot(slot)] = '';
   lote.atualizadoEm = new Date().toISOString();
-  saveState(); closeModal('overlayLote'); renderAll();
+  saveState();
+  abrirEntradaProvador(numero);
 }
-
-/* ==================== FOTO ETIQUETA ==================== */
-function carregarFoto(numero, input){
-  const file = input.files[0];
-  if(!file) return;
-  const reader = new FileReader();
-  reader.onload = ()=>{
-    const img = new Image();
-    img.onload = ()=>{
-      const maxW = 900;
-      const scale = Math.min(1, maxW / img.width);
-      const canvas = document.createElement('canvas');
-      canvas.width = img.width * scale;
-      canvas.height = img.height * scale;
-      const ctx = canvas.getContext('2d');
-      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-      const dataUrl = canvas.toDataURL('image/jpeg', 0.75);
-      const lote = state.lotes[numero];
-      lote.fotoEtiqueta = dataUrl;
-      lote.dataFotografia = new Date().toISOString();
-      lote.fotoCapturadaPor = lote.provador1 || lote.provador2 || '';
-      lote.atualizadoEm = new Date().toISOString();
-      saveState();
-      openLoteDetail(numero);
-    };
-    img.src = reader.result;
-  };
-  reader.readAsDataURL(file);
-}
-function verFotoCheia(numero){
+function abrirEntradaProvador(numero){
   const lote = state.lotes[numero];
-  if(!lote.fotoEtiqueta) return;
-  const div = document.createElement('div');
-  div.className = 'photo-fullscreen';
-  div.onclick = ()=> div.remove();
-  div.innerHTML = `<img src="${lote.fotoEtiqueta}">`;
-  document.body.appendChild(div);
+  const slot = proximoSlotProva(lote);
+  if(!slot) return;
+  if(tempoEsperaProvador(lote, slot) > 0){ openLoteDetail(numero); return; }
+  // Se este provador já tinha começado a prova (registo guardado com "Fechar sem concluir"), não
+  // obriga a escolher o nome outra vez — retoma logo no ecrã de registo com o que já tinha preenchido.
+  const nomeCampo = nomeCampoSlot(slot);
+  if(lote[nomeCampo] && !lote.registos[slot].concluido){
+    openRegistoModal(numero, slot);
+    return;
+  }
+  const modalRoot = document.getElementById('modalRoot');
+  modalRoot.innerHTML = `
+  <div class="overlay" id="overlayEntrada">
+    <div class="modal">
+      <button class="modal-close" onclick="closeModal('overlayEntrada')">&times;</button>
+      <h2>Iniciar Prova — ${escapeHtml(numero)}</h2>
+      <div class="sub">Quem vai fazer esta prova?</div>
+      <div class="field"><label>Provador</label><select id="fNomeEntrada">${opcoesProvadores('')}</select></div>
+      <div class="actions-row">
+        <button class="btn btn-primary btn-block" onclick="confirmarEntradaProvador('${numero}')">Continuar</button>
+      </div>
+    </div>
+  </div>`;
+}
+function confirmarEntradaProvador(numero){
+  const lote = state.lotes[numero];
+  const slot = proximoSlotProva(lote);
+  if(!slot) return;
+  const nome = document.getElementById('fNomeEntrada').value.trim();
+  if(!nome){ alert('Escolhe o teu nome.'); return; }
+  if(nomesJaUsados(lote, slot).includes(nome)){
+    alert('Este provador já fez uma prova neste lote — chama outra pessoa para continuar.');
+    return;
+  }
+  const faltamMin = tempoEsperaProvador(lote, slot);
+  if(faltamMin > 0){
+    alert(`É preciso esperar pelo menos 30 minutos entre provadores. Faltam ${faltamMin} minuto(s).`);
+    return;
+  }
+  lote[slot==='p1'?'provador1':(slot==='p2'?'provador2':'provador3')] = nome;
+  if(slot==='p1') lote.provaAbertaEm = new Date().toISOString(); // marca quando a prova foi aberta
+  lote.atualizadoEm = new Date().toISOString();
+  saveState();
+  closeModal('overlayEntrada');
+  openRegistoModal(numero, slot);
 }
 
 /* ==================== REGISTO PROVADOR (lista de frascos com aroma, mobile-friendly) ==================== */
-let ctxLote = null, ctxProvador = null, formFlags = {};
+/* 14/09/2026: registo por toque direto. Até 50 frascos mostra-se uma grelha 1..N — o provador toca no
+   número do frasco em que encontrou aroma, em qualquer ordem (sem navegação forçada, sem escrever
+   números). Acima de 50 frascos mantém-se a entrada manual original (nº do frasco + aroma + Adicionar). */
+let ctxLote = null, ctxProvador = null, frascoAtivoGrid = null, chipManualSelecionado = null;
 function labelProvador(p){ return p==='p1'?'Provador 1':(p==='p2'?'Provador 2':'Provador 3'); }
 function openRegistoModal(numero, provador){
   if(provador==='p2' && !state.lotes[numero].registos.p1.concluido) return;
@@ -1468,28 +1809,22 @@ function openRegistoModal(numero, provador){
   const loteChk = state.lotes[numero];
   if(loteChk.registos[provador].concluido){ return openRegistoReadOnly(numero, provador); }
   ctxLote = numero; ctxProvador = provador;
-  formFlags = {tcaF:false,tcaP:false,mofoF:false,mofoP:false,outro:false};
+  frascoAtivoGrid = null; chipManualSelecionado = null;
   const lote = state.lotes[numero];
   const reg = lote.registos[provador];
+  const total = lote.numeroFrascos || 50;
+  const instrucao = total <= 50
+    ? 'Toca no número do frasco assim que encontrares um aroma — podes tocar em qualquer ordem.'
+    : 'Indica o número do frasco e o aroma encontrado e toca em "+ Adicionar Frasco".';
   const modalRoot = document.getElementById('modalRoot');
   modalRoot.innerHTML = `
   <div class="overlay" id="overlayRegisto">
     <div class="modal">
       <button class="modal-close" onclick="closeModal('overlayRegisto')">&times;</button>
       <h2>${labelProvador(provador)} — ${escapeHtml(numero)}</h2>
-      <div class="sub">Aponta apenas os frascos com aroma. Os restantes ficam limpos por omissão.</div>
+      <div class="sub">${instrucao}</div>
 
-      <div class="field"><label>Nº do Frasco</label><input id="fNumFrasco" type="number" min="1" placeholder="ex: 7"></div>
-      <div class="chip-toggle" id="chipToggle">
-        <button type="button" data-k="tcaF" onclick="toggleChip('tcaF')">TCA · Forte</button>
-        <button type="button" data-k="tcaP" onclick="toggleChip('tcaP')">TCA · Percetível</button>
-        <button type="button" data-k="mofoF" onclick="toggleChip('mofoF')">Mofo · Forte</button>
-        <button type="button" data-k="mofoP" onclick="toggleChip('mofoP')">Mofo · Percetível</button>
-        <button type="button" data-k="outro" onclick="toggleChip('outro')">Outro Aroma</button>
-      </div>
-      <button class="btn btn-primary btn-block" onclick="adicionarFrasco()">+ Adicionar Frasco</button>
-
-      <div class="itens-list" id="itensList"></div>
+      <div id="frascosArea"></div>
 
       <fieldset style="margin-top:14px;">
         <legend>Apreciação Geral</legend>
@@ -1500,34 +1835,134 @@ function openRegistoModal(numero, provador){
         <div class="field" style="margin-top:10px;"><label>Observações</label><textarea id="fObsRegisto">${escapeHtml(reg.observacoes)}</textarea></div>
       </fieldset>
       <div class="actions-row">
-        <button class="btn" onclick="closeModal('overlayRegisto')">Fechar sem concluir</button>
+        <button class="btn" onclick="fecharRegistoSemConcluir()">Fechar sem concluir</button>
         <button class="btn btn-primary" onclick="concluirRegisto()">Concluir e Assinar</button>
       </div>
     </div>
   </div>`;
-  renderItensList();
+  renderRegistoFrascos();
 }
-function toggleChip(k){
-  formFlags[k] = !formFlags[k];
-  document.querySelector(`#chipToggle button[data-k="${k}"]`).classList.toggle('on', formFlags[k]);
+/* Dispatcher: grelha (<=50 frascos) vs entrada manual (>50 frascos) */
+function renderRegistoFrascos(){
+  const el = document.getElementById('frascosArea');
+  if(!el) return;
+  const lote = state.lotes[ctxLote];
+  const total = lote.numeroFrascos || 50;
+  if(total <= 50){
+    el.innerHTML = htmlGrelha(total);
+  } else {
+    el.innerHTML = htmlEntradaManual(total);
+    renderItensList();
+  }
 }
-function adicionarFrasco(){
-  const n = parseInt(document.getElementById('fNumFrasco').value);
-  if(!n || n<1){ alert('Indica o nº do frasco.'); return; }
-  if(!Object.values(formFlags).some(Boolean)){ alert('Seleciona pelo menos um aroma.'); return; }
+function itemFrasco(n){
   const reg = state.lotes[ctxLote].registos[ctxProvador];
-  reg.itens = reg.itens.filter(it=> it.frasco !== n); // substitui se já existir
-  reg.itens.push({ frasco:n, ...formFlags });
+  return reg.itens.find(it=> it.frasco===n);
+}
+function codAroma(it){
+  if(!it) return '';
+  if(it.tcaF) return 'TCA-F';
+  if(it.tcaP) return 'TCA-P';
+  if(it.mofoF) return 'MOF-F';
+  if(it.mofoP) return 'MOF-P';
+  if(it.outro) return 'OUTRO';
+  return '';
+}
+/* ---- grelha de toque direto (<=50 frascos) ---- */
+function htmlGrelha(total){
+  if(frascoAtivoGrid) return htmlSeletorAroma(frascoAtivoGrid, total);
+  // 1ª posição da grelha fica em branco (o frasco 1 avança para a 2ª posição), tal como no esquema
+  let tiles = '<div class="frasco-tile frasco-vazio" aria-hidden="true"></div>';
+  for(let n=1;n<=total;n++){
+    const it = itemFrasco(n);
+    tiles += `<button type="button" class="frasco-tile ${it?'marcado':''}" onclick="abrirSeletorGrid(${n})">
+      <span class="ft-num">${n}</span>${it?`<span class="ft-cod">${codAroma(it)}</span>`:''}
+    </button>`;
+  }
+  return `<div class="frasco-grid">${tiles}</div>`;
+}
+function htmlSeletorAroma(n, total){
+  const it = itemFrasco(n);
+  const chipAtual = it ? ['tcaF','tcaP','mofoF','mofoP','outro'].find(k=> it[k]) : null;
+  return `
+    <div class="seq-header">
+      <button type="button" class="btn btn-sm" onclick="fecharSeletorGrid()">◀ Voltar à grelha</button>
+      <div class="seq-contador">Frasco <strong>${n}</strong> de ${total}</div>
+    </div>
+    <div class="aroma-picker">
+      <button type="button" data-k="tcaF" class="${chipAtual==='tcaF'?'on':''}" onclick="marcarChipGrid('tcaF')">TCA<br>Forte</button>
+      <button type="button" data-k="tcaP" class="${chipAtual==='tcaP'?'on':''}" onclick="marcarChipGrid('tcaP')">TCA<br>Percetível</button>
+      <button type="button" data-k="mofoF" class="${chipAtual==='mofoF'?'on':''}" onclick="marcarChipGrid('mofoF')">Mofo<br>Forte</button>
+      <button type="button" data-k="mofoP" class="${chipAtual==='mofoP'?'on':''}" onclick="marcarChipGrid('mofoP')">Mofo<br>Percetível</button>
+      <button type="button" data-k="outro" class="aroma-full ${chipAtual==='outro'?'on':''}" onclick="marcarChipGrid('outro')">Outro Aroma</button>
+    </div>
+    <button type="button" class="aroma-limpo" onclick="marcarSemAromaGrid()">${chipAtual?'Limpar marcação (voltar a Sem Aroma)':'Sem aroma neste frasco'}</button>`;
+}
+function abrirSeletorGrid(n){ frascoAtivoGrid = n; renderRegistoFrascos(); }
+function fecharSeletorGrid(){ frascoAtivoGrid = null; renderRegistoFrascos(); }
+function marcarChipGrid(k){
+  const reg = state.lotes[ctxLote].registos[ctxProvador];
+  reg.itens = reg.itens.filter(it=> it.frasco!==frascoAtivoGrid);
+  const novoItem = { frasco: frascoAtivoGrid, tcaF:false, tcaP:false, mofoF:false, mofoP:false, outro:false };
+  novoItem[k] = true;
+  reg.itens.push(novoItem);
   reg.itens.sort((a,b)=>a.frasco-b.frasco);
+  state.lotes[ctxLote].atualizadoEm = new Date().toISOString();
   saveState();
-  document.getElementById('fNumFrasco').value='';
-  formFlags = {tcaF:false,tcaP:false,mofoF:false,mofoP:false,outro:false};
-  document.querySelectorAll('#chipToggle button').forEach(b=>b.classList.remove('on'));
+  fecharSeletorGrid();
+}
+function marcarSemAromaGrid(){
+  const reg = state.lotes[ctxLote].registos[ctxProvador];
+  reg.itens = reg.itens.filter(it=> it.frasco!==frascoAtivoGrid);
+  state.lotes[ctxLote].atualizadoEm = new Date().toISOString();
+  saveState();
+  fecharSeletorGrid();
+}
+/* ---- entrada manual original (>50 frascos) ---- */
+function htmlEntradaManual(total){
+  return `
+    <div class="field"><label>Nº do Frasco</label><input id="fNumFrasco" type="number" min="1" max="${total}" placeholder="ex: 23"></div>
+    <div class="chip-toggle" id="chipToggleManual">
+      <button type="button" data-k="tcaF" onclick="toggleChipManual('tcaF')">TCA · Forte</button>
+      <button type="button" data-k="tcaP" onclick="toggleChipManual('tcaP')">TCA · Percetível</button>
+      <button type="button" data-k="mofoF" onclick="toggleChipManual('mofoF')">Mofo · Forte</button>
+      <button type="button" data-k="mofoP" onclick="toggleChipManual('mofoP')">Mofo · Percetível</button>
+      <button type="button" data-k="outro" onclick="toggleChipManual('outro')">Outro Aroma</button>
+    </div>
+    <div class="actions-row">
+      <button type="button" class="btn btn-primary btn-block" onclick="adicionarFrascoManual(${total})">+ Adicionar Frasco</button>
+    </div>
+    <div class="itens-list" id="itensList"></div>`;
+}
+function toggleChipManual(k){
+  chipManualSelecionado = (chipManualSelecionado===k) ? null : k;
+  document.querySelectorAll('#chipToggleManual button').forEach(b=>{
+    b.classList.toggle('on', b.dataset.k===chipManualSelecionado);
+  });
+}
+function adicionarFrascoManual(total){
+  const numEl = document.getElementById('fNumFrasco');
+  const n = parseInt(numEl.value);
+  if(!n || n<1 || n>total){ alert(`Indica um número de frasco entre 1 e ${total}.`); return; }
+  if(!chipManualSelecionado){ alert('Escolhe o aroma detetado.'); return; }
+  const reg = state.lotes[ctxLote].registos[ctxProvador];
+  reg.itens = reg.itens.filter(it=> it.frasco!==n);
+  const novoItem = { frasco:n, tcaF:false, tcaP:false, mofoF:false, mofoP:false, outro:false };
+  novoItem[chipManualSelecionado] = true;
+  reg.itens.push(novoItem);
+  reg.itens.sort((a,b)=>a.frasco-b.frasco);
+  state.lotes[ctxLote].atualizadoEm = new Date().toISOString();
+  saveState();
+  numEl.value = '';
+  chipManualSelecionado = null;
+  document.querySelectorAll('#chipToggleManual button').forEach(b=>b.classList.remove('on'));
   renderItensList();
+  numEl.focus();
 }
 function removerFrasco(n){
   const reg = state.lotes[ctxLote].registos[ctxProvador];
   reg.itens = reg.itens.filter(it=> it.frasco !== n);
+  state.lotes[ctxLote].atualizadoEm = new Date().toISOString();
   saveState();
   renderItensList();
 }
@@ -1548,17 +1983,33 @@ function renderItensList(){
       <button onclick="removerFrasco(${it.frasco})">✕</button>
     </div>`).join('') : `<div class="empty-note" style="padding:8px 0;">Nenhum frasco com aroma adicionado ainda.</div>`;
 }
-function concluirRegisto(){
+/* "Fechar sem concluir" não pode ser um reset — guarda sempre o que já foi preenchido (frascos,
+   apreciação, observações) e só não assina/bloqueia o registo. Fica pronto a retomar mais tarde. */
+function fecharRegistoSemConcluir(){
   const lote = state.lotes[ctxLote];
   const reg = lote.registos[ctxProvador];
   const apr = document.querySelector('input[name="apreciacao"]:checked');
-  if(!apr){ alert('Seleciona a apreciação geral (Limpo / Pouco Limpo).'); return; }
+  reg.apreciacao = apr ? apr.value : reg.apreciacao;
+  const obsEl = document.getElementById('fObsRegisto');
+  if(obsEl) reg.observacoes = obsEl.value.trim();
+  lote.atualizadoEm = new Date().toISOString();
+  saveState();
+  closeModal('overlayRegisto');
+  renderAll();
+}
+function concluirRegisto(){
+  const lote = state.lotes[ctxLote];
+  const reg = lote.registos[ctxProvador];
+  // Apreciação Geral e Observações deixaram de ser obrigatórias (11/09/2026) — mas o que for
+  // preenchido é sempre guardado.
+  const apr = document.querySelector('input[name="apreciacao"]:checked');
   if(!confirm('Ao assinar, este registo fica bloqueado e deixa de poder ser alterado. Confirmas que terminaste a prova?')) return;
-  reg.apreciacao = apr.value;
+  reg.apreciacao = apr ? apr.value : '';
   reg.observacoes = document.getElementById('fObsRegisto').value.trim();
   reg.concluido = true;
   reg.assinadoEm = new Date().toISOString();
   lote.atualizadoEm = new Date().toISOString();
+  tentarAutoFinalizar(ctxLote);
   saveState();
   closeModal('overlayRegisto');
   renderAll();
@@ -1584,7 +2035,7 @@ function openRegistoReadOnly(numero, provador){
       <div class="itens-list">${itensHtml}</div>
       <fieldset style="margin-top:14px;">
         <legend>Apreciação Geral</legend>
-        <div class="empty-note" style="padding:2px 0;text-align:left;"><strong>${reg.apreciacao==='limpo'?'Limpo':'Pouco Limpo'}</strong></div>
+        <div class="empty-note" style="padding:2px 0;text-align:left;"><strong>${reg.apreciacao==='limpo'?'Limpo':(reg.apreciacao==='pouco_limpo'?'Pouco Limpo':'Não preenchido')}</strong></div>
         ${reg.observacoes ? `<div class="field" style="margin-top:8px;"><label>Observações</label><div class="empty-note" style="padding:2px 0;text-align:left;">${escapeHtml(reg.observacoes)}</div></div>` : ''}
       </fieldset>
       <div class="actions-row">
@@ -1664,105 +2115,15 @@ function concluirRevisaoConjunta(numero){
   lote.revisaoConjunta.observacoes = document.getElementById('fObsRevisao').value.trim();
   lote.revisaoConjunta.data = new Date().toISOString();
   lote.atualizadoEm = new Date().toISOString();
+  tentarAutoFinalizar(numero); // se a revisão resolveu a divergência, pode já dar para fechar sozinho
   saveState();
   closeModal('overlayRevisao');
   renderAll();
   openLoteDetail(numero);
 }
 
-/* ==================== LAB (decide o lote com base nos totais) ==================== */
-function openTaniaModal(numero){
-  const lote = state.lotes[numero];
-  const uniao = uniaoTally(lote);
-  const temP3 = lote.registos.p3.concluido || (lote.registos.p3.itens||[]).length>0;
-  const m1 = itensToMap(lote.registos.p1.itens);
-  const m2 = itensToMap(lote.registos.p2.itens);
-  const m3 = itensToMap(lote.registos.p3.itens);
-  const rows = uniao.frascos.map(n=>`<tr><td><strong>${n}</strong></td><td>${resumoFlags(m1[n]||{}) || 'Limpo'}</td><td>${resumoFlags(m2[n]||{}) || 'Limpo'}</td>${temP3?`<td>${resumoFlags(m3[n]||{}) || 'Limpo'}</td>`:''}</tr>`).join('');
-  const motivoSugerido = temP3
-    ? `Cruzamento com o Provador 3 — total de ${uniao.total} frasco(s) com defeito.`
-    : (uniao.total>3 ? `Mais de 3 frascos com defeito (${uniao.total}) — regra automática de rejeição.` : `Provador 1 e Provador 2 concordam — ${uniao.total} frasco(s) com defeito.`);
-  const decisaoSugerida = uniao.total>3 ? 'rejeitado' : (uniao.total===0 ? 'aprovado' : 'rejeitado');
-
-  const modalRoot = document.getElementById('modalRoot');
-  modalRoot.innerHTML = `
-  <div class="overlay" id="overlayTania">
-    <div class="modal">
-      <button class="modal-close" onclick="closeModal('overlayTania')">&times;</button>
-      <h2>Decisão do LAB</h2>
-      <div class="sub">Lote ${escapeHtml(numero)} — decisão com base no total de frascos com defeito.</div>
-      <div class="tally">
-        <div class="box"><div class="n">${uniao.tca}</div><div class="lbl">TCA</div></div>
-        <div class="box"><div class="n">${uniao.mofo}</div><div class="lbl">Mofo</div></div>
-        <div class="box"><div class="n">${uniao.outros}</div><div class="lbl">Outros</div></div>
-      </div>
-      <div class="suggest-banner ${uniao.total>3?'rej':(uniao.total===0?'apr':'rej')}">${uniao.total} frasco(s) com defeito no total${uniao.total>3?' — acima de 3, regra sugere REJEITADO':''}.</div>
-      <table class="compare-table">
-        <thead><tr><th>Frasco</th><th>Provador 1</th><th>Provador 2</th>${temP3?'<th>Provador 3</th>':''}</tr></thead>
-        <tbody>${rows || `<tr><td colspan="${temP3?4:3}">Sem frascos com aroma assinalado.</td></tr>`}</tbody>
-      </table>
-      <div class="field"><label>Motivo</label><input id="fMotivoTania" value="${escapeHtml(lote.decisao.motivoEscalamento || motivoSugerido)}"></div>
-      <div class="field"><label>Nome de quem decide (LAB)</label><select id="fNomeTania">${opcoesProvadores('Tânia Lino')}</select></div>
-      <div class="field"><label>Observações / Conclusão do LAB</label><textarea id="fObsTania">${escapeHtml(lote.registos.tania.observacoes)}</textarea></div>
-      <div class="field"><label>Decisão</label>
-        <select id="fDecisaoTania">
-          <option value="aprovado" ${decisaoSugerida==='aprovado'?'selected':''}>Aprovado</option>
-          <option value="rejeitado" ${decisaoSugerida==='rejeitado'?'selected':''}>Rejeitado</option>
-        </select>
-      </div>
-      <div class="actions-row">
-        <button class="btn btn-primary btn-block" onclick="finalizarProvaTania('${numero}')">Finalizar Prova</button>
-      </div>
-    </div>
-  </div>`;
-}
-function finalizarProvaTania(numero){
-  const decisao = document.getElementById('fDecisaoTania').value;
-  decidirLotePelaTania(numero, decisao);
-}
-function decidirLotePelaTania(numero, final){
-  const lote = state.lotes[numero];
-  lote.registos.tania.concluido = true;
-  lote.registos.tania.observacoes = document.getElementById('fObsTania').value.trim();
-  lote.decisao.final = final;
-  lote.decisao.supervisorResponsavel = document.getElementById('fNomeTania').value.trim() || 'LAB';
-  lote.decisao.motivoEscalamento = document.getElementById('fMotivoTania').value.trim();
-  lote.decisao.comentarios = lote.registos.tania.observacoes;
-  lote.decisao.data = new Date().toISOString().slice(0,10);
-  lote.atualizadoEm = new Date().toISOString();
-  saveState();
-  closeModal('overlayTania');
-  renderAll();
-  openLoteDetail(numero);
-}
-
-/* ==================== EXPORT (CSV / XLS) ==================== */
-function dadosResumoLotes(){
-  const header = ['Nº Lote','Prioridade','Estado','Provador 1','Provador 2','Provador 3','TCA','Mofo','Outros','Decisão','Decidido/Avaliado por','Motivo Escalada','Comentários'];
-  const rows = todosLotes().map(l=>{
-    const t = uniaoTally(l);
-    return [l.numeroLote, prioLabel(l.prioridade), STATUS_META[computeStatus(l)]?.label, l.provador1, l.provador2, l.provador3||'', t.tca, t.mofo, t.outros,
-      l.decisao.final||'', l.decisao.decididoPor||l.decisao.supervisorResponsavel||'', l.decisao.motivoEscalamento||'', l.decisao.comentarios||''];
-  });
-  return {header, rows};
-}
-document.getElementById('btnExportCsv').addEventListener('click', ()=>{
-  const {header, rows} = dadosResumoLotes();
-  const csv = [header, ...rows].map(r=> r.map(v=>`"${String(v??'').replace(/"/g,'""')}"`).join(';')).join('\n');
-  const blob = new Blob(['﻿'+csv], {type:'text/csv;charset=utf-8;'});
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a'); a.href = url; a.download = `prova_sensorial_resumo_${new Date().toISOString().slice(0,10)}.csv`; a.click(); URL.revokeObjectURL(url);
-});
-function exportarLotesXlsx(){
-  const {header, rows} = dadosResumoLotes();
-  if(!rows.length){ alert('Não há lotes para exportar.'); return; }
-  const ws = XLSX.utils.aoa_to_sheet([header, ...rows]);
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, 'Lotes');
-  XLSX.writeFile(wb, `prova_sensorial_resumo_${new Date().toISOString().slice(0,10)}.xlsx`);
-}
-
 /* ==================== INIT ==================== */
+aplicarFlagDevGerarLoteTeste();
 hydrate();
 
 if('serviceWorker' in navigator){
