@@ -1421,9 +1421,25 @@ function notificarNovosPendentesP3(){
       method:'POST',
       headers:{'Content-Type':'application/json'},
       body: JSON.stringify({ numeroLote:l.numeroLote, prioridade:l.prioridade })
+    }).then(res=>{
+      // res.ok===false (ex.: 404, se o server.js publicado ainda não tiver este endpoint) não é um
+      // "falhou a rede" — o fetch nem rejeita nesse caso — por isso confirma-se aqui também, para
+      // tentar outra vez mais tarde assim que o servidor tiver a rota.
+      if(!res.ok) l.alertaP3Enviado = false;
     }).catch(()=>{ l.alertaP3Enviado = false; });
     saveState();
   });
+}
+// Manutenção: se o servidor ainda não tinha o endpoint /api/notify-provador3 (ex.: publicaste só o
+// index.html sem o server.js atualizado), os lotes já pendentes ficaram marcados como notificados
+// mesmo sem o email ter saído. Corre isto na consola do browser, uma vez, depois de publicares o
+// server.js novo, para forçar a tentar de novo os lotes ainda à espera do 3º provador.
+function reenviarAlertaP3(){
+  const pendentes = lotesAguardaP3();
+  pendentes.forEach(l=>{ l.alertaP3Enviado = false; });
+  guardarLocal();
+  renderAll();
+  console.log(`Marcados ${pendentes.length} lote(s) para tentar notificar outra vez.`);
 }
 function renderAll(){
   autoFinalizarPendentes();
