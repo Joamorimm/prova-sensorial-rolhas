@@ -398,6 +398,7 @@ textarea#taPrioridadesInput{min-height:110px;font-family:ui-monospace,monospace;
         <button class="btn btn-sm btn-primary" onclick="abrirScannerCodigoBarras()">Ler Código de Barras</button>
         <button class="btn btn-sm btn-primary" onclick="document.getElementById('fileOrdens').click()" title="Seleciona os 2 ficheiros ao mesmo tempo: Amostragens 2026 + Ordem de Trabalhos 2026">Importar Ordens (Excel)</button>
         <button class="btn btn-sm hidden" id="btnGerarLoteTeste" style="border:1px dashed var(--muted);" onclick="gerarLoteTeste()" title="Fase de testes — cria um lote de teste vazio, disponível hoje, para correres a prova toda à mão. Tira este botão depois de validares tudo.">Gerar lote de teste (DEV)</button>
+        <button class="btn btn-sm hidden" id="btnAlertaP3" style="border-color:var(--prio-u);color:var(--prio-u);font-weight:700;" onclick="abrirAlertaProvador3()" title="Lote(s) com divergência entre provadores por resolver — precisam do 3º provador">⚠ Provador 3: <span id="contagemAlertaP3">0</span></button>
       </div>
       <input type="file" id="fileOrdens" accept=".xlsx,.xls,.xlsm,.csv" multiple class="hidden">
       <div class="legend-cores">
@@ -474,7 +475,7 @@ textarea#taPrioridadesInput{min-height:110px;font-family:ui-monospace,monospace;
     </div>
     <button class="nav-fab" onclick="identificarLote()">+</button>
     <div class="nav-side">
-      <button class="nav-btn" id="navLevantamento" onclick="switchView('levantamento')">Logística<span class="nav-badge hidden" id="badgeP3" title="Lote(s) à espera do 3º provador">0</span></button>
+      <button class="nav-btn" id="navLevantamento" onclick="switchView('levantamento')">Logística</button>
     </div>
   </nav>
 </div>
@@ -510,6 +511,7 @@ function garantirCamposNovos(l){
   if(!l.revisaoConjunta) l.revisaoConjunta = { feita:false, observacoes:'', data:'' };
   if(l.provador3===undefined) l.provador3 = '';
   if(l.provaAbertaEm===undefined) l.provaAbertaEm = '';
+  if(l.alertaP3Enviado===undefined) l.alertaP3Enviado = false;
   // Recupera a Data de Abertura da Prova em lotes onde o Provador 1 já entrou (nome preenchido) mas
   // este campo nunca chegou a ser gravado — acontece em lotes cujo Provador 1 entrou numa versão
   // anterior da app, antes deste campo existir. Sem isto, ficaria "—" para sempre mesmo já concluído.
@@ -587,6 +589,26 @@ function limparLotesDeTeste(){
   if(apagou) guardarLocal();
   return apagou;
 }
+// Ação de manutenção pontual (16/09/2026): apaga TODOS os lotes MENOS os que estão na lista dada —
+// os da lista ficam exatamente como estão, sem tocar nos dados (já foram operados pelos provadores).
+// Corre-se a partir da consola do browser (F12 -> Console) com a app aberta:
+//   limparTudoExceto(['LT02376374','LT02376173', ...])
+// Pede sempre confirmação antes de apagar e mostra no fim, na consola, o que ficou.
+function limparTudoExceto(manterLista){
+  const manter = new Set((manterLista||[]).map(normLote));
+  const paraApagar = Object.keys(state.lotes).filter(num=> !manter.has(num));
+  if(!paraApagar.length){ console.log('Nada para apagar — já só há lotes da lista a manter.'); return; }
+  const totalAntes = Object.keys(state.lotes).length;
+  const msg = `Vais apagar ${paraApagar.length} lote(s) de ${totalAntes} e manter ${totalAntes - paraApagar.length}. Esta ação não tem "desfazer". Confirmas?`;
+  if(!confirm(msg)){ console.log('Cancelado — nada foi apagado.'); return; }
+  paraApagar.forEach(num=>{
+    delete state.lotes[num];
+    fetch('/api/lotes/'+encodeURIComponent(num), {method:'DELETE'}).catch(()=>{});
+  });
+  guardarLocal();
+  renderAll();
+  console.log(`Apagados ${paraApagar.length} lote(s). Ficaram: ${Object.keys(state.lotes).join(', ') || '(nenhum)'}`);
+}
 async function hydrate(){
   try{
     const raw = localStorage.getItem(STORAGE_KEY);
@@ -633,6 +655,7 @@ function criarLoteVazio(numero){
     revisaoConjunta: { feita:false, observacoes:'', data:'' },
     decisao: { final:null, comentarios:'', decididoPor:'', data:'', supervisorResponsavel:'', motivoEscalamento:'' },
     levantamentoConcluido: false, levantamentoData: '',
+    alertaP3Enviado: false, // controla o envio do email de alerta do 3º provador (nunca duplica)
     criadoEm: new Date().toISOString(),
     atualizadoEm: new Date().toISOString()
   };
@@ -1351,21 +1374,61 @@ function autoFinalizarPendentes(){
   });
   if(alterou) saveState();
 }
+// Lotes com divergência entre P1/P2 ainda por resolver — precisam do 3º provador.
+function lotesAguardaP3(){
+  return todosLotes().filter(l=> computeStatus(l)==='aguarda_p3');
+}
 function atualizarBadgeP3(){
-  // aviso dentro da app (sem email) quando é preciso chamar o 3º provador — seja por divergência
-  // de conjunto entre P1/P2, seja por já ir em 4+ frascos com TCA/Mofo ou Mofo Forte.
-  const badge = document.getElementById('badgeP3');
-  if(!badge) return;
-  const n = todosLotes().filter(l=>{
-    const st = computeStatus(l);
-    return st==='aguarda_p3';
-  }).length;
-  badge.textContent = n>9 ? '9+' : String(n);
-  badge.classList.toggle('hidden', n===0);
+  // aviso dentro da app (botão dinâmico no ecrã Lotes) quando é preciso chamar o 3º provador —
+  // seja por divergência de conjunto entre P1/P2, seja por já ir em 4+ frascos com TCA/Mofo ou
+  // Mofo Forte. Só vive aqui (não há mais um badge solto no botão "Logística" — só mostrava um
+  // número sem contexto nenhum; este botão mostra o número E já abre o(s) lote(s) ao clicar).
+  const pendentes = lotesAguardaP3();
+  const n = pendentes.length;
+  const btn = document.getElementById('btnAlertaP3');
+  const contagem = document.getElementById('contagemAlertaP3');
+  if(contagem) contagem.textContent = n>9 ? '9+' : String(n);
+  if(btn) btn.classList.toggle('hidden', n===0);
+}
+// Abre a lista de lotes à espera do 3º provador — se só houver um, abre-o logo; com vários, mostra
+// um mini-modal a escolher (reaproveita o espaço do botão "Gerar lote de teste (DEV)" no ecrã Lotes).
+function abrirAlertaProvador3(){
+  const pendentes = lotesAguardaP3();
+  if(!pendentes.length) return;
+  if(pendentes.length===1){ openLoteDetail(pendentes[0].numeroLote); return; }
+  const modalRoot = document.getElementById('modalRoot');
+  modalRoot.innerHTML = `
+  <div class="overlay" id="overlayAlertaP3">
+    <div class="modal">
+      <button class="modal-close" onclick="closeModal('overlayAlertaP3')">&times;</button>
+      <h2>Lotes à espera do 3º provador</h2>
+      <div class="sub">Toca num lote para abrir e fazer o registo do Provador 3.</div>
+      <div class="actions-row" style="flex-wrap:wrap;gap:8px;">
+        ${pendentes.map(l=>`<button class="btn btn-sm" onclick="closeModal('overlayAlertaP3');openLoteDetail('${escapeHtml(l.numeroLote)}')">${escapeHtml(l.numeroLote)}</button>`).join('')}
+      </div>
+    </div>
+  </div>`;
+}
+// Alerta por email (best-effort): assim que um lote passa a precisar do 3º provador, avisa uma vez
+// só (fica marcado em alertaP3Enviado, para nunca duplicar o email). Se o servidor não tiver o SMTP
+// configurado no Railway, ou não houver rede, falha em silêncio — o aviso dentro da app já existe.
+function notificarNovosPendentesP3(){
+  lotesAguardaP3().forEach(l=>{
+    if(l.alertaP3Enviado) return;
+    l.alertaP3Enviado = true;
+    l.atualizadoEm = new Date().toISOString();
+    fetch('/api/notify-provador3', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ numeroLote:l.numeroLote, prioridade:l.prioridade })
+    }).catch(()=>{ l.alertaP3Enviado = false; });
+    saveState();
+  });
 }
 function renderAll(){
   autoFinalizarPendentes();
   atualizarBadgeP3();
+  notificarNovosPendentesP3();
   renderGradeLotes();
   if(!document.getElementById('view-levantamento').classList.contains('hidden')) renderListaLevantamento();
   if(!document.getElementById('view-lab').classList.contains('hidden')) renderTabelaLAB();
