@@ -8,10 +8,30 @@ const http = require('http');
 const path = require('path');
 const fs = require('fs');
 const { Server } = require('socket.io');
+const nodemailer = require('nodemailer');
 
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
+
+// ---------- Alerta por email: lote precisa do 3º provador ----------
+// Só fica ativo se SMTP_HOST/SMTP_USER/SMTP_PASS e ALERT_EMAIL_TO estiverem definidos no Railway
+// (Settings -> Variables). Sem isso, a app continua a funcionar normalmente — só não manda email
+// (o aviso dentro da app, no ecrã Lotes e no separador Logística, continua a aparecer na mesma).
+const SMTP_HOST = process.env.SMTP_HOST || '';
+const ALERT_EMAIL_TO = process.env.ALERT_EMAIL_TO || '';
+let mailer = null;
+if (SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS) {
+  mailer = nodemailer.createTransport({
+    host: SMTP_HOST,
+    port: Number(process.env.SMTP_PORT || 587),
+    secure: process.env.SMTP_SECURE === 'true', // true só para a porta 465
+    auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
+  });
+}
+// proteção extra contra emails duplicados (o cliente já evita reenviar, isto é só uma rede de segurança
+// dentro da mesma execução do servidor — reinicia-se quando o Railway reinicia o serviço)
+const p3JaNotificados = new Set();
 
 // ---------- Persistência: Postgres (preferido) ou ficheiro (fallback) ----------
 // Se a variável de ambiente DATABASE_URL estiver definida (ex: ligando um serviço
@@ -167,6 +187,34 @@ app.delete('/api/lotes/:numero', async (req, res) => {
     io.emit('lotes:sync', { lotes: store.lotes });
   }
   res.json({ ok: true });
+});
+
+// Avisa por email quando um lote passa a precisar do 3º provador (divergência entre Provador 1 e
+// Provador 2 que a Revisão Conjunta não resolveu). O cliente só chama isto uma vez por lote.
+app.post('/api/notify-provador3', async (req, res) => {
+  const { numeroLote, prioridade } = req.body || {};
+  if (!numeroLote) return res.status(400).json({ ok: false, erro: 'numeroLote em falta' });
+
+  if (!mailer || !ALERT_EMAIL_TO) {
+    return res.json({ ok: true, enviado: false, motivo: 'SMTP/ALERT_EMAIL_TO não configurados no Railway' });
+  }
+  if (p3JaNotificados.has(numeroLote)) {
+    return res.json({ ok: true, enviado: false, motivo: 'já notificado nesta sessão do servidor' });
+  }
+  const prioridadeTxt = prioridade === 'vermelho' ? ' (prioridade: Urgente)' : (prioridade === 'amarelo' ? ' (prioridade: Prioritário)' : '');
+  try {
+    await mailer.sendMail({
+      from: process.env.ALERT_EMAIL_FROM || process.env.SMTP_USER,
+      to: ALERT_EMAIL_TO,
+      subject: `Prova Sensorial — lote ${numeroLote} precisa do 3º provador`,
+      text: `O lote ${numeroLote}${prioridadeTxt} tem uma divergência entre o Provador 1 e o Provador 2 que a Revisão Conjunta não resolveu — é preciso o 3º provador.\n\nAbre a app "Prova Sensorial de Amostras de Rolhas" para o registar.`,
+    });
+    p3JaNotificados.add(numeroLote);
+    res.json({ ok: true, enviado: true });
+  } catch (e) {
+    console.error('Erro a enviar email de alerta do 3º provador:', e.message);
+    res.json({ ok: true, enviado: false, motivo: 'falha no envio' });
+  }
 });
 
 io.on('connection', (socket) => {
