@@ -1757,7 +1757,7 @@ function openLoteDetail(numero){
       <div class="field"><label>Nº Rolhas por Frasco</label><div class="empty-note" style="text-align:left;padding:8px 0 0;">${lote.numeroRolhasPorFrasco}</div></div>
       <div class="field"></div>
     </div>
-    ${lote.bartops ? `<div class="empty-note" style="text-align:left;padding:2px 0 11px;font-weight:700;color:var(--bartops);">● Bartops — informação vinda da lista de prioridades (só leitura)</div>` : ''}
+    ${lote.bartops ? `<div class="empty-note" style="text-align:left;padding:2px 0 11px;font-weight:700;color:var(--bartops);">● Bartops</div>` : ''}
     <div class="two-col" style="margin-top:2px;">
       <div class="field"><label>Data Planeamento</label><div class="empty-note" style="text-align:left;padding:8px 0 0;">${formatarDataBR(lote.criadoEm)}</div></div>
       <div class="field"><label>Data Abertura da Prova</label><div class="empty-note" style="text-align:left;padding:8px 0 0;">${formatarDataBR(lote.provaAbertaEm)}</div></div>
