@@ -62,6 +62,8 @@ var __Html5QrcodeLibrary__;(()=>{var t={449:function(t,e,r){!function(t){"use st
   --yellow-bg:#f5ecd6;
   --green:#71805a;
   --green-bg:#e9ecdf;
+  --purple:#6d3f63;
+  --purple-bg:#e9dee6;
   --grey:#8d8271;
   --grey-bg:#ece5d6;
   --blue:#6f8a80;
@@ -348,8 +350,16 @@ legend{font-size:11.5px;font-weight:800;color:var(--muted);padding:0 6px;text-tr
    selecionar/copiar os botões à mão, que concatena tudo numa única célula) */
 .lab-col-copy{display:block;margin:4px auto 0;border:none;background:none;color:var(--accent-dark);font-size:9.5px;font-weight:700;text-decoration:underline;text-transform:none;padding:2px 4px;}
 .lab-col-lista{display:flex;flex-direction:column;gap:6px;}
-.lab-lote-btn{display:flex;align-items:center;justify-content:center;gap:4px;background:var(--panel);border:1.5px solid var(--border);border-radius:8px;padding:7px 4px;font-size:11px;font-weight:800;color:var(--text);word-break:break-all;text-align:center;}
+.lab-lote-btn{flex:1;display:flex;align-items:center;justify-content:center;gap:4px;background:var(--panel);border:1.5px solid var(--border);border-radius:8px;padding:7px 4px;font-size:11px;font-weight:800;color:var(--text);word-break:break-all;text-align:center;}
 .lab-lote-btn:active{transform:scale(.96);}
+.lab-lote-btn.copiado{background:var(--purple-bg);border-color:var(--purple);color:var(--purple);}
+.lab-lote-wrap{position:relative;display:flex;flex-direction:column;gap:3px;}
+.lab-lote-row{display:flex;align-items:center;gap:5px;}
+.lab-lote-check{width:15px;height:15px;flex-shrink:0;accent-color:var(--accent-dark);}
+.lab-obs-flag{position:absolute;top:-5px;right:-3px;color:var(--accent-dark);font-size:13px;font-weight:900;line-height:1;}
+.lab-mini-tabela{width:100%;border-collapse:collapse;font-size:8.5px;}
+.lab-mini-tabela th,.lab-mini-tabela td{border:1px solid var(--border);padding:2px 1px;text-align:center;}
+.lab-mini-tabela th{background:#f3ecdb;font-weight:800;color:var(--muted);font-size:7.5px;}
 
 /* Histórico: linhas compactas (Data · Nº Lote · letra) que expandem ao tocar, em vez de uma
    tabela larga com scroll horizontal — o resto da informação (provadores) só aparece se pedida. */
@@ -433,19 +443,19 @@ textarea#taPrioridadesInput{min-height:110px;font-family:ui-monospace,monospace;
       <div class="lab-colunas">
         <div class="lab-col">
           <div class="lab-col-titulo">Planeados <span class="n" id="labContPlaneados">0</span>
-            <button type="button" class="lab-col-copy no-print" onclick="copiarColunaLAB('planeados', this)" title="Copiar números dos lotes — um por linha, para colar diretamente numa coluna no Excel">Copiar</button>
+            <button type="button" class="lab-col-copy no-print" onclick="copiarColunaLAB('planeados', this)" title="Copiar números dos lotes — um por linha, para colar diretamente numa coluna no Excel. Marca as caixas para copiar e assinalar (roxo) só alguns lotes como já enviados ao LAB.">Copiar</button>
           </div>
           <div class="lab-col-lista" id="labColPlaneados"></div>
         </div>
         <div class="lab-col">
           <div class="lab-col-titulo">WIP <span class="n" id="labContWip">0</span>
-            <button type="button" class="lab-col-copy no-print" onclick="copiarColunaLAB('wip', this)" title="Copiar números dos lotes — um por linha, para colar diretamente numa coluna no Excel">Copiar</button>
+            <button type="button" class="lab-col-copy no-print" onclick="copiarColunaLAB('wip', this)" title="Copiar números dos lotes — um por linha, para colar diretamente numa coluna no Excel. Marca as caixas para copiar e assinalar (roxo) só alguns lotes como já enviados ao LAB.">Copiar</button>
           </div>
           <div class="lab-col-lista" id="labColWip"></div>
         </div>
         <div class="lab-col">
           <div class="lab-col-titulo">Concluídos <span class="n" id="labContConcluidos">0</span>
-            <button type="button" class="lab-col-copy no-print" onclick="copiarColunaLAB('concluidos', this)" title="Copiar números dos lotes — um por linha, para colar diretamente numa coluna no Excel">Copiar</button>
+            <button type="button" class="lab-col-copy no-print" onclick="copiarColunaLAB('concluidos', this)" title="Copiar números dos lotes — um por linha, para colar diretamente numa coluna no Excel. Marca as caixas para copiar e assinalar (roxo) só alguns lotes como já enviados ao LAB.">Copiar</button>
           </div>
           <div class="lab-col-lista" id="labColConcluidos"></div>
         </div>
@@ -1353,32 +1363,71 @@ function abrirResumoEstado(){
 function letraPrioHtml(l){
   return l.prioridade==='vermelho' ? '<span class="letra-prio l-u">U</span>' : (l.prioridade==='amarelo' ? '<span class="letra-prio l-p">P</span>' : '');
 }
-function loteBadgeLAB(l){
-  return `<button type="button" class="lab-lote-btn" onclick="openLoteDetail('${escapeHtml(l.numeroLote)}')">${letraPrioHtml(l)}${escapeHtml(l.numeroLote)}</button>`;
+/* Seleção de lotes no LAB (para o "Copiar" seletivo) — é só um estado de trabalho local do ecrã,
+   não é guardado nem sincronizado: cada pessoa marca os lotes que está prestes a copiar/enviar. */
+let labSelecionados = new Set();
+function toggleSelecaoLAB(numero, checkbox){
+  if(checkbox.checked) labSelecionados.add(numero); else labSelecionados.delete(numero);
 }
-function renderColunaLAB(elId, contId, lotes){
+function loteBadgeLAB(l, mostrarTabela){
+  const numero = escapeHtml(l.numeroLote);
+  const marcado = labSelecionados.has(l.numeroLote);
+  const copiado = !!l.copiadoLAB;
+  const ambosObs = !!(l.registos.p1.observacoes && l.registos.p2.observacoes);
+  let tabelaHtml = '';
+  if(mostrarTabela){
+    const t = uniaoTally(l);
+    tabelaHtml = `<table class="lab-mini-tabela"><thead><tr><th>TCA</th><th>MOFO</th><th>OUTROS</th></tr></thead><tbody><tr><td>${t.tca}</td><td>${t.mofo}</td><td>${t.outros}</td></tr></tbody></table>`;
+  }
+  return `<div class="lab-lote-wrap" data-lote="${numero}">
+    ${ambosObs ? `<span class="lab-obs-flag" title="Observações preenchidas pelos 2 provadores">&#10038;</span>` : ''}
+    <div class="lab-lote-row">
+      <input type="checkbox" class="lab-lote-check" ${marcado?'checked':''} onclick="event.stopPropagation(); toggleSelecaoLAB('${numero}', this)" title="Selecionar para copiar só este lote">
+      <button type="button" class="lab-lote-btn${copiado?' copiado':''}" onclick="openLoteDetail('${numero}')" title="${copiado?'Já copiado/enviado ao LAB':''}">${letraPrioHtml(l)}${numero}</button>
+    </div>
+    ${tabelaHtml}
+  </div>`;
+}
+function renderColunaLAB(elId, contId, lotes, mostrarTabela){
   const cont = document.getElementById(contId);
   if(cont) cont.textContent = lotes.length;
   const el = document.getElementById(elId);
   if(!el) return;
-  el.innerHTML = lotes.length ? lotes.map(loteBadgeLAB).join('') : `<div class="empty-note" style="font-size:11px;padding:4px 0;">Sem lotes.</div>`;
+  el.innerHTML = lotes.length ? lotes.map(l=> loteBadgeLAB(l, mostrarTabela)).join('') : `<div class="empty-note" style="font-size:11px;padding:4px 0;">Sem lotes.</div>`;
 }
 function renderTabelaLAB(){
   const todos = todosLotes();
-  renderColunaLAB('labColPlaneados', 'labContPlaneados', todos.filter(l=> grupoLoteLAB(l)==='planeados'));
-  renderColunaLAB('labColWip', 'labContWip', todos.filter(l=> grupoLoteLAB(l)==='wip'));
-  renderColunaLAB('labColConcluidos', 'labContConcluidos', todos.filter(l=> grupoLoteLAB(l)==='concluidos'));
+  // a mini-tabela TCA/MOFO/OUTROS só aparece em Concluídos (a pedido) — Planeados/WIP mantêm-se só
+  // com a caixa de seleção + botão do lote (o "Copiar" continua a levar TCA/MOFO/OUTROS nas 3 colunas).
+  renderColunaLAB('labColPlaneados', 'labContPlaneados', todos.filter(l=> grupoLoteLAB(l)==='planeados'), false);
+  renderColunaLAB('labColWip', 'labContWip', todos.filter(l=> grupoLoteLAB(l)==='wip'), false);
+  renderColunaLAB('labColConcluidos', 'labContConcluidos', todos.filter(l=> grupoLoteLAB(l)==='concluidos'), true);
   if(historicoLABAberto) renderTabelaHistoricoLAB();
 }
 /* Selecionar/copiar os botões dos lotes à mão concatena tudo numa única célula do Excel (e ainda
    mistura a letra U/P no meio do texto) — este botão copia só os nºs de lote, um por linha, para
-   colar direto numa coluna. Copia direto, sem popup a pedir para clicar OK — o próprio botão pisca
-   "Copiado" por instantes como confirmação. */
+   colar direto numa coluna no Excel (a mini-tabela TCA/MOFO/OUTROS é só para ver no ecrã, não entra
+   no texto copiado). Copia direto, sem popup a pedir para clicar OK — o próprio botão pisca "Copiado"
+   por instantes como confirmação.
+   Se houver lotes marcados (checkbox) nesta coluna, copia só esses e marca-os já, no momento do clique,
+   como enviados ao LAB (ficam roxo, e a marcação de seleção é limpa) — é o "corte de responsabilidade":
+   dá para ver de imediato quais já foram passados e quais ainda faltam. Sem nenhum marcado, copia a
+   coluna toda como sempre, sem mexer em nenhuma cor. */
 function copiarColunaLAB(grupo, btn){
   const lotes = todosLotes().filter(l=> grupoLoteLAB(l)===grupo);
   if(!lotes.length){ if(btn) feedbackBotaoCopiar(btn, 'Sem lotes'); return; }
-  const texto = lotes.map(l=> l.numeroLote).join('\n');
-  copiarTextoParaClipboard(texto, ()=>{ if(btn) feedbackBotaoCopiar(btn, `Copiado (${lotes.length})`); });
+  const selecionados = lotes.filter(l=> labSelecionados.has(l.numeroLote));
+  const usar = selecionados.length ? selecionados : lotes;
+  const texto = usar.map(l=> l.numeroLote).join('\n');
+  // a marcação (roxo) é imediata, ao clicar — não espera pela confirmação do clipboard, para o "cut off
+  // de responsabilidade" ficar visível logo ali; só o texto "Copiado" do botão é que espera essa confirmação.
+  if(selecionados.length){
+    const agora = new Date().toISOString();
+    selecionados.forEach(l=>{ l.copiadoLAB = true; l.atualizadoEm = agora; labSelecionados.delete(l.numeroLote); });
+    saveState();
+    renderTabelaLAB();
+  }
+  copiarTextoParaClipboard(texto, ()=>{ if(btn) feedbackBotaoCopiar(btn, `Copiado (${usar.length})`); });
 }
 function feedbackBotaoCopiar(btn, texto){
   const original = btn.textContent;
