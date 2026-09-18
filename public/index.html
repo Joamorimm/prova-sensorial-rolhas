@@ -175,7 +175,7 @@ main{padding:14px 14px 10px;}
 .quad-lote:active{transform:scale(.95);}
 /* mesmo "botão" colorido por prioridade da grelha de Lotes, mas em formato pill (não quadrado) para
    encabeçar o cartão do Levantamento — usa as mesmas classes q-prio-* para ter sempre a cor certa */
-.quad-lote.lev-tile{aspect-ratio:auto;display:inline-flex;padding:9px 18px;font-size:14px;margin-bottom:10px;}
+.quad-lote.lev-tile{aspect-ratio:auto;display:inline-flex;padding:9px 18px;font-size:15px;font-weight:900;letter-spacing:.02em;margin-bottom:10px;}
 .quad-lote.q-prio-normal{background:var(--prio-n-bg);color:var(--text);border:2px solid var(--prio-n);}
 /* Prioritário = coral da marca: fundo claro de mais para texto branco, por isso usa texto escuro para se ler bem */
 .quad-lote.q-prio-prioritario{background:var(--prio-p-bg);color:var(--text);border:2px solid var(--prio-p);}
@@ -198,9 +198,12 @@ main{padding:14px 14px 10px;}
 /* estado escrito por extenso dentro do próprio quadrado (Planeado / WIP) — independente da cor de
    prioridade. Encostado à base, com fundo semi-transparente para se ler bem em cima de qualquer cor. */
 .quad-estado-txt{position:absolute;left:0;right:0;bottom:0;padding:3px 2px;font-size:9.5px;font-weight:800;letter-spacing:.03em;text-transform:uppercase;color:#fff;text-align:center;border-radius:0 0 9px 9px;}
-/* Planeado = o mais claro (ainda não começou) · WIP = já mais intenso (o coral da marca), texto branco */
+/* Planeado = o mais claro (ainda não começou) · WIP 1/2 = amarelado/alaranjado (só um provador já
+   passou) · WIP 2/2 = verde (os dois provadores já passaram — a Logística já pode levantar os
+   frascos, mesmo que a decisão ainda esteja pendente) */
 .quad-estado-txt.e-planeado{background:rgba(255,255,255,.6);color:var(--text);}
-.quad-estado-txt.e-wip{background:var(--status-lab);color:#fff;}
+.quad-estado-txt.e-wip1{background:#EDB05E;color:var(--text);}
+.quad-estado-txt.e-wip2{background:#357246;color:#fff;}
 /* lote importado hoje mas só pode ser cheirado amanhã (D+1) — visível já, mas assinalado como ainda não disponível */
 .quad-lote.futuro{opacity:.6;border-style:dashed;}
 
@@ -301,6 +304,9 @@ legend{font-size:11.5px;font-weight:800;color:var(--muted);padding:0 6px;text-tr
 
 /* grelha de frascos (nº1 a nº50): toque direto e em qualquer ordem, sem navegação forçada */
 .frasco-grid{display:grid;grid-template-columns:repeat(8,1fr);gap:6px;margin:4px 0 14px;}
+/* navegação entre "ondas" de 50 frascos, para lotes com mais de 50 (100, 150, 200...) */
+.onda-nav{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:10px;}
+.onda-contador{font-size:13px;font-weight:700;color:var(--text);text-align:center;flex:1;}
 .frasco-tile{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;border:1.5px solid var(--border);background:#faf5ea;border-radius:10px;padding:6px 1px;min-height:42px;color:var(--text);}
 .frasco-tile .ft-num{font-size:14px;font-weight:800;}
 .frasco-tile .ft-cod{font-size:9px;font-weight:700;letter-spacing:.2px;}
@@ -473,7 +479,7 @@ textarea#taPrioridadesInput{min-height:110px;font-family:ui-monospace,monospace;
       <button class="nav-btn active" id="navInicio" onclick="switchView('inicio')">Lotes</button>
       <button class="nav-btn" id="navLab" onclick="switchView('lab')">LAB</button>
     </div>
-    <button class="nav-fab" onclick="identificarLote()">+</button>
+    <button class="nav-fab" type="button" title="Ainda sem ação definida">+</button>
     <div class="nav-side">
       <button class="nav-btn" id="navLevantamento" onclick="switchView('levantamento')">Logística</button>
     </div>
@@ -490,18 +496,39 @@ textarea#taPrioridadesInput{min-height:110px;font-family:ui-monospace,monospace;
 <script>
 /* ==================== ESTADO / DADOS ==================== */
 const STORAGE_KEY = 'provaSensorialRolhas_v2';
-const PROVADORES = ['Joana Amorim','Ana Catarina Silva','Francisca Braga','Francisco Sousa','Marta Santos','Tânia Lino','Raquel Santos','Teresa Pinto'];
+// Lista de provadores: passou a ser editável (17/09/2026), a partir do painel de administração.
+// DEFAULT_PROVADORES só serve para semear a lista da primeira vez (antes de existir configuração
+// no servidor) — a partir daí, a lista "verdadeira" é state.provadoresLista, sincronizada como
+// o resto dos dados (ver ==================== CONFIGURAÇÃO PARTILHADA (provadores) ====================).
+const DEFAULT_PROVADORES = ['Joana Amorim','Ana Catarina Silva','Francisca Braga','Francisco Sousa','Marta Santos','Tânia Lino','Raquel Santos','Teresa Pinto'];
 function opcoesProvadores(selecionado){
-  return '<option value="">— Escolher —</option>' + PROVADORES.map(n=>
+  const lista = (state.provadoresLista && state.provadoresLista.length) ? state.provadoresLista : DEFAULT_PROVADORES;
+  return '<option value="">— Escolher —</option>' + lista.map(n=>
     `<option value="${escapeHtml(n)}" ${selecionado===n?'selected':''}>${escapeHtml(n)}</option>`).join('');
 }
-let state = { lotes: {} }; // chave = numero de lote (string normalizada)
+let state = { lotes: {}, removidos: {}, provadoresLista: null }; // chave = numero de lote (string normalizada); removidos = tombstones (numero -> data de remoção); provadoresLista = null até chegar do servidor
+
+/* ==================== ACESSO DE ADMINISTRAÇÃO ====================
+   Travão simples (não é segurança real — é só front-end, qualquer pessoa com acesso ao código
+   consegue ver a palavra-passe) para evitar que provadores mexam por engano em campos que, em
+   condições normais, vêm fixos do Excel (nº frascos, nº rolhas, prioridade) ou na lista geral de
+   provadores. Pedida sempre que se tenta abrir o painel "Editar informações" de um lote. */
+const ADMIN_PASSWORD = 'harv81admin';
+function pedirAcessoAdmin(aoConfirmar){
+  const tentativa = prompt('Palavra-passe de administração:');
+  if(tentativa === null) return; // cancelou
+  if(tentativa !== ADMIN_PASSWORD){ alert('Palavra-passe incorreta.'); return; }
+  aoConfirmar();
+}
 
 /* ==================== SINCRONIZAÇÃO PARTILHADA (servidor + Socket.IO) ====================
    state.lotes continua a ser a "verdade" local, guardada também em localStorage como cache
    offline. Sempre que muda, é enviada ao servidor; o servidor só substitui, por lote, quando
    a versão que chega é mais recente (campo atualizadoEm) — assim ninguém perde alterações de
-   outro utilizador. O servidor devolve/transmite o resultado a todos os ligados. */
+   outro utilizador. O servidor devolve/transmite o resultado a todos os ligados.
+   state.removidos guarda os "tombstones" (nº de lote -> data em que foi apagado). É persistido
+   no servidor e reenviado a todos os dispositivos — impede que um telemóvel/browser com uma
+   cópia antiga em cache (localStorage) "ressuscite" um lote já apagado ao voltar a sincronizar. */
 /* Migração defensiva: lotes criados antes da introdução do Provador 3 / Revisão Conjunta
    não têm estes campos — evita erros ao aceder a lote.registos.p3 nesses casos antigos. */
 function garantirCamposNovos(l){
@@ -534,6 +561,24 @@ function mergeLotes(a, b){
   migrarTodosLotes(out);
   return out;
 }
+// Junta dois mapas de tombstones (numero -> data de remoção), mantendo sempre a data mais recente.
+function mergeRemovidos(a, b){
+  const out = {...(a||{})};
+  Object.keys(b||{}).forEach(k=>{
+    if(!out[k] || b[k] > out[k]) out[k] = b[k];
+  });
+  return out;
+}
+// Aplica os tombstones a um mapa de lotes: remove qualquer lote cuja última atualização seja
+// anterior (ou igual) ao momento em que foi apagado — é isto que impede que uma cache local
+// antiga (noutro telemóvel/browser) faça "ressuscitar" um lote já apagado por todos.
+function aplicarRemovidos(lotes, removidos){
+  Object.keys(removidos||{}).forEach(numero=>{
+    const l = lotes[numero];
+    if(l && (l.atualizadoEm||'') <= removidos[numero]) delete lotes[numero];
+  });
+  return lotes;
+}
 function guardarLocal(){
   try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }catch(e){}
 }
@@ -552,7 +597,9 @@ async function enviarAoServidor(){
     if(!res.ok) return;
     const data = await res.json();
     if(data && data.lotes){
+      state.removidos = mergeRemovidos(state.removidos, data.removidos || {});
       state.lotes = mergeLotes(state.lotes, data.lotes);
+      aplicarRemovidos(state.lotes, state.removidos);
       guardarLocal();
     }
   }catch(e){
@@ -568,10 +615,39 @@ function conectarSocket(){
   if(typeof io === 'undefined') return;
   socketRef = io();
   socketRef.on('lotes:sync', (payload)=>{
+    state.removidos = mergeRemovidos(state.removidos, (payload && payload.removidos) || {});
     state.lotes = mergeLotes(state.lotes, (payload && payload.lotes) || {});
+    aplicarRemovidos(state.lotes, state.removidos);
     guardarLocal();
     renderAll();
   });
+  socketRef.on('config:sync', (payload)=>{
+    aplicarConfig(payload && payload.config);
+    guardarLocal();
+    renderAll();
+  });
+}
+// Grava a lista geral de provadores no servidor (partilhada por todos) — usada tanto para
+// semear o servidor na primeira vez como para qualquer alteração feita no painel de administração.
+async function guardarProvadoresNoServidor(lista){
+  const atualizadoEm = new Date().toISOString();
+  try{
+    const res = await fetch('/api/config', {
+      method:'PUT', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ provadores: lista, atualizadoEm })
+    });
+    if(res.ok){
+      const data = await res.json();
+      aplicarConfig(data && data.config);
+    } else {
+      state.provadoresLista = lista; state.provadoresAtualizadoEm = atualizadoEm;
+    }
+  }catch(e){
+    console.warn('Sem ligação ao servidor — a lista de provadores só ficou guardada localmente por agora.', e);
+    state.provadoresLista = lista; state.provadoresAtualizadoEm = atualizadoEm;
+  }
+  guardarLocal();
+  renderAll();
 }
 // Apaga qualquer lote de teste (prefixo LT0999..., criado pelo botão "Gerar lote de teste (DEV)")
 // que ainda esteja na cache local ou no servidor — para arrancar "a zeros" na publicação em Railway.
@@ -582,6 +658,7 @@ function limparLotesDeTeste(){
   Object.keys(state.lotes).forEach(num=>{
     if(num.startsWith(PREFIXO_TESTE)){
       delete state.lotes[num];
+      state.removidos[num] = new Date().toISOString();
       fetch('/api/lotes/'+encodeURIComponent(num), {method:'DELETE'}).catch(()=>{});
       apagou = true;
     }
@@ -603,6 +680,7 @@ function limparTudoExceto(manterLista){
   if(!confirm(msg)){ console.log('Cancelado — nada foi apagado.'); return; }
   paraApagar.forEach(num=>{
     delete state.lotes[num];
+    state.removidos[num] = new Date().toISOString();
     fetch('/api/lotes/'+encodeURIComponent(num), {method:'DELETE'}).catch(()=>{});
   });
   guardarLocal();
@@ -615,14 +693,18 @@ async function hydrate(){
     if(raw) state = JSON.parse(raw);
   }catch(e){}
   if(!state.lotes) state.lotes = {};
+  if(!state.removidos) state.removidos = {};
   migrarTodosLotes(state.lotes);
+  aplicarRemovidos(state.lotes, state.removidos); // limpa já da cache local qualquer lote entretanto apagado
   limparLotesDeTeste();
   renderAll(); // mostra logo o que já estava em cache, sem esperar pela rede
   try{
     const res = await fetch('/api/lotes');
     if(res.ok){
       const data = await res.json();
+      state.removidos = mergeRemovidos(state.removidos, (data && data.removidos) || {});
       state.lotes = mergeLotes(state.lotes, (data && data.lotes) || {});
+      aplicarRemovidos(state.lotes, state.removidos);
       limparLotesDeTeste(); // também limpa lotes de teste que já tivessem chegado a sincronizar no servidor
       guardarLocal();
       renderAll();
@@ -631,7 +713,29 @@ async function hydrate(){
   }catch(e){
     console.warn('Sem ligação ao servidor no arranque — a trabalhar só com os dados locais.', e);
   }
+  try{
+    const resCfg = await fetch('/api/config');
+    if(resCfg.ok){
+      const dataCfg = await resCfg.json();
+      if(dataCfg && dataCfg.config && Array.isArray(dataCfg.config.provadores) && dataCfg.config.provadores.length){
+        aplicarConfig(dataCfg.config);
+        guardarLocal();
+        renderAll();
+      } else if(!state.provadoresLista || !state.provadoresLista.length){
+        // servidor ainda não tem configuração nenhuma — semeia com a lista por defeito
+        guardarProvadoresNoServidor(DEFAULT_PROVADORES.slice());
+      }
+    }
+  }catch(e){
+    console.warn('Sem ligação ao servidor — lista de provadores fica com o valor por defeito/local por agora.', e);
+  }
   conectarSocket();
+}
+function aplicarConfig(config){
+  if(config && Array.isArray(config.provadores) && config.provadores.length){
+    state.provadoresLista = config.provadores;
+    state.provadoresAtualizadoEm = config.atualizadoEm || '';
+  }
 }
 function normLote(s){ return (s||'').trim().toUpperCase(); }
 
@@ -984,8 +1088,15 @@ function renderGradeLotes(){
     // estado escrito por extenso no próprio quadrado (não uma barra abstrata): PLANEADO = ninguém
     // começou ainda · WIP = já há provador a trabalhar, mas ainda não concluiu. Um lote concluído
     // nunca aparece aqui — sai logo desta grelha (ver lotesDeHoje) e passa a viver no Histórico.
-    const estadoClasse = l.provador1 ? 'e-wip' : 'e-planeado';
-    const estadoTxt = l.provador1 ? 'WIP' : 'Planeado';
+    // Dentro do WIP, a cor da barra distingue quantos provadores já passaram fisicamente pelo lote:
+    // 1 de 2 (amarelado/alaranjado) vs 2 de 2 (verde — já dá para a Logística levantar os frascos,
+    // mesmo que a decisão ainda esteja pendente).
+    const p1Feito = !!(l.registos.p1 && l.registos.p1.concluido);
+    const p2Feito = !!(l.registos.p2 && l.registos.p2.concluido);
+    let estadoClasse, estadoTxt;
+    if(!l.provador1){ estadoClasse = 'e-planeado'; estadoTxt = 'Planeado'; }
+    else if(p1Feito && p2Feito){ estadoClasse = 'e-wip2'; estadoTxt = 'WIP'; }
+    else { estadoClasse = 'e-wip1'; estadoTxt = 'WIP'; }
     const estadoHtml = `<span class="quad-estado-txt ${estadoClasse}">${estadoTxt}</span>`;
     const tituloEstado = STATUS_META[st]?STATUS_META[st].label:'';
     // importado hoje mas só pode ser cheirado a partir de amanhã (D+1) — mostra-se já, mas visualmente assinalado
@@ -1404,7 +1515,7 @@ function abrirAlertaProvador3(){
       <h2>Lotes à espera do 3º provador</h2>
       <div class="sub">Toca num lote para abrir e fazer o registo do Provador 3.</div>
       <div class="actions-row" style="flex-wrap:wrap;gap:8px;">
-        ${pendentes.map(l=>`<button class="btn btn-sm" onclick="closeModal('overlayAlertaP3');openLoteDetail('${escapeHtml(l.numeroLote)}')">${escapeHtml(l.numeroLote)}</button>`).join('')}
+        ${pendentes.map(l=>`<button class="btn btn-sm btn-primary" onclick="closeModal('overlayAlertaP3');openLoteDetail('${escapeHtml(l.numeroLote)}')">${escapeHtml(l.numeroLote)}</button>`).join('')}
       </div>
     </div>
   </div>`;
@@ -1637,7 +1748,8 @@ function openLoteDetail(numero){
 
   let corpoExtra = '';
 
-  // Ficha base + foto etiqueta (Nº Frascos vem só do Excel — deixou de ser editável à mão)
+  // Ficha base + foto etiqueta (Nº Frascos/Rolhas vêm do Excel — só editáveis através do painel
+  // de administração, protegido por palavra-passe, para não serem alterados por engano)
   corpoExtra += `
   <fieldset>
     <legend>Identificação do Lote</legend>
@@ -1645,12 +1757,17 @@ function openLoteDetail(numero){
       <div class="field"><label>Prioridade</label><div class="empty-note" style="text-align:left;padding:8px 0 0;">${prioLabel(lote.prioridade)} <span style="opacity:.7;">(definida na importação — não editável)</span></div></div>
       <div class="field"><label>Nº Frascos</label><div class="empty-note" style="text-align:left;padding:8px 0 0;">${lote.numeroFrascos} <span style="opacity:.7;">(vem do Excel — não editável)</span></div></div>
     </div>
+    <div class="two-col" style="margin-top:2px;">
+      <div class="field"><label>Nº Rolhas por Frasco</label><div class="empty-note" style="text-align:left;padding:8px 0 0;">${lote.numeroRolhasPorFrasco}</div></div>
+      <div class="field"></div>
+    </div>
     ${lote.bartops ? `<div class="empty-note" style="text-align:left;padding:2px 0 11px;font-weight:700;color:var(--bartops);">● Bartops — informação vinda da lista de prioridades (só leitura)</div>` : ''}
     <div class="two-col" style="margin-top:2px;">
       <div class="field"><label>Data Planeamento</label><div class="empty-note" style="text-align:left;padding:8px 0 0;">${formatarDataBR(lote.criadoEm)}</div></div>
       <div class="field"><label>Data Abertura da Prova</label><div class="empty-note" style="text-align:left;padding:8px 0 0;">${formatarDataBR(lote.provaAbertaEm)}</div></div>
     </div>
     ${lote.decisao.final ? `<div class="field" style="margin-top:10px;"><label>Data Conclusão</label><div class="empty-note" style="text-align:left;padding:8px 0 0;">${formatarDataBR(lote.decisao.data)}</div></div>` : ''}
+    <button type="button" class="btn btn-sm" id="btnEditarInfoLote" style="margin-top:10px;" onclick="pedirAcessoAdmin(()=>abrirEdicaoLote('${numero}'))" title="Pede palavra-passe de administração — permite corrigir nº de frascos, nº de rolhas, prioridade, eliminar o lote, ou gerir a lista geral de provadores">Editar informações</button>
   </fieldset>`;
 
   // Registos — o provador já não escolhe "sou o 1 ou o 2": escolhe só o nome, a app decide o lugar.
@@ -1724,13 +1841,9 @@ function openLoteDetail(numero){
     </fieldset>`;
   } else if(status==='aguarda_p3'){
     const det = uniaoTallyDetalhada(lote);
-    const motivoTxt = divergeSet.length
-      ? `Frasco(s) ${divergeSet.join(', ')} continuam a divergir depois da Revisão Conjunta.`
-      : `${det.contaveis} frasco(s) com TCA/Mofo${det.mofoForte?' (inclui Mofo Forte)':''} — vai direto para o 3º provador desempatar.`;
     corpoExtra += `
     <fieldset>
       <legend>É preciso o 3º Provador</legend>
-      <div class="empty-note" style="color:var(--red);padding:6px 0;">${motivoTxt} O LAB não participa — o 3º provador regista a prova normalmente (usa "Iniciar Prova" acima) e assim que assinar, o lote fica logo concluído.</div>
       <div class="tally">
         <div class="box"><div class="n">${det.tcaForte}</div><div class="lbl">TCA Forte</div></div>
         <div class="box"><div class="n">${det.tcaPercetivel}</div><div class="lbl">TCA Percet.</div></div>
@@ -1766,9 +1879,115 @@ function alterarCampo(numero, campo, val){ state.lotes[numero][campo] = val; sta
 function apagarLote(numero){
   if(!confirm('Apagar este registo definitivamente? Isto remove-o para todos os utilizadores.')) return;
   delete state.lotes[numero];
+  state.removidos[numero] = new Date().toISOString();
   guardarLocal();
   fetch('/api/lotes/'+encodeURIComponent(numero), {method:'DELETE'}).catch(()=>{});
-  closeModal('overlayLote'); renderAll();
+  const modalRoot = document.getElementById('modalRoot');
+  if(modalRoot) modalRoot.innerHTML = ''; // fecha qualquer modal aberto (ficha, edição, etc.)
+  renderAll();
+}
+
+/* ==================== PAINEL DE EDIÇÃO (protegido por palavra-passe) ====================
+   Acesso a campos normalmente fixos (vindos do Excel): nº frascos, nº rolhas por frasco,
+   prioridade, eliminar o lote — e à lista geral de provadores (partilhada por todos). */
+function abrirEdicaoLote(numero){
+  const lote = state.lotes[numero];
+  if(!lote) return;
+  const modalRoot = document.getElementById('modalRoot');
+  modalRoot.innerHTML = `
+  <div class="overlay" id="overlayEdicaoLote">
+    <div class="modal">
+      <button class="modal-close" onclick="openLoteDetail('${numero}')">&times;</button>
+      <h2>Editar informações — ${escapeHtml(numero)}</h2>
+      <div class="sub">Painel de administração. Estes campos vêm normalmente do Excel — só altera se tiveres a certeza.</div>
+      <fieldset>
+        <legend>Dados do Lote</legend>
+        <div class="field"><label>Prioridade</label>
+          <select id="fEdPrioridade">
+            <option value="normal" ${lote.prioridade==='normal'?'selected':''}>Normal</option>
+            <option value="amarelo" ${lote.prioridade==='amarelo'?'selected':''}>Prioritário</option>
+            <option value="vermelho" ${lote.prioridade==='vermelho'?'selected':''}>Urgente</option>
+          </select>
+        </div>
+        <div class="two-col" style="margin-top:8px;">
+          <div class="field"><label>Nº Frascos</label><input id="fEdFrascos" type="number" min="1" value="${lote.numeroFrascos}"></div>
+          <div class="field"><label>Nº Rolhas por Frasco</label><input id="fEdRolhas" type="number" min="1" value="${lote.numeroRolhasPorFrasco}"></div>
+        </div>
+        <label style="display:flex;align-items:center;gap:8px;margin-top:10px;font-size:13px;font-weight:600;">
+          <input type="checkbox" id="fEdBartops" ${lote.bartops?'checked':''} style="width:auto;"> Bartops
+        </label>
+      </fieldset>
+      <div class="actions-row" style="margin-top:12px;">
+        <button class="btn" onclick="openLoteDetail('${numero}')">Cancelar</button>
+        <button class="btn btn-primary" onclick="guardarEdicaoLote('${numero}')">Guardar alterações</button>
+      </div>
+      <button class="btn" style="margin-top:16px;width:100%;border-color:var(--red);color:var(--red);" onclick="apagarLote('${numero}')">Eliminar lote definitivamente</button>
+      <button class="btn" style="margin-top:16px;width:100%;" onclick="abrirGestaoProvadores('${numero}')">Gerir lista geral de Provadores</button>
+    </div>
+  </div>`;
+}
+function guardarEdicaoLote(numero){
+  const lote = state.lotes[numero];
+  if(!lote) return;
+  const novaPrioridade = document.getElementById('fEdPrioridade').value;
+  const novosFrascos = parseInt(document.getElementById('fEdFrascos').value);
+  const novasRolhas = parseInt(document.getElementById('fEdRolhas').value);
+  const novoBartops = document.getElementById('fEdBartops').checked;
+  if(!novosFrascos || novosFrascos < 1){ alert('Indica um nº de frascos válido (mínimo 1).'); return; }
+  if(!novasRolhas || novasRolhas < 1){ alert('Indica um nº de rolhas por frasco válido (mínimo 1).'); return; }
+  lote.prioridade = novaPrioridade;
+  lote.numeroFrascos = novosFrascos;
+  lote.numeroRolhasPorFrasco = novasRolhas;
+  lote.bartops = novoBartops;
+  lote.atualizadoEm = new Date().toISOString();
+  saveState();
+  renderAll();
+  openLoteDetail(numero);
+}
+
+/* ---- Gestão da lista geral de Provadores (partilhada por todos, dentro do painel de administração) ---- */
+function listaProvadoresAtual(){
+  return (state.provadoresLista && state.provadoresLista.length) ? state.provadoresLista.slice() : DEFAULT_PROVADORES.slice();
+}
+function abrirGestaoProvadores(numeroLoteParaVoltar){
+  const modalRoot = document.getElementById('modalRoot');
+  const lista = listaProvadoresAtual();
+  const voltarAttr = numeroLoteParaVoltar ? `'${numeroLoteParaVoltar}'` : 'null';
+  const fecharAcao = numeroLoteParaVoltar ? `abrirEdicaoLote(${voltarAttr})` : `closeModal('overlayGestaoProvadores')`;
+  modalRoot.innerHTML = `
+  <div class="overlay" id="overlayGestaoProvadores">
+    <div class="modal">
+      <button class="modal-close" onclick="${fecharAcao}">&times;</button>
+      <h2>Lista Geral de Provadores</h2>
+      <div class="sub">Partilhada por toda a app — uma alteração aqui aplica-se a todos os utilizadores.</div>
+      <div id="listaProvadoresAdmin">${lista.length ? lista.map((n,i)=>`
+        <div class="item-row">
+          <div class="fn">${escapeHtml(n)}</div>
+          <button onclick="removerProvadorAdmin(${i}, ${voltarAttr})">✕</button>
+        </div>`).join('') : `<div class="empty-note" style="padding:8px 0;">Sem provadores na lista.</div>`}
+      </div>
+      <div class="field" style="margin-top:12px;"><label>Adicionar novo provador</label><input id="fNovoProvador" placeholder="Nome completo"></div>
+      <div class="actions-row">
+        <button class="btn btn-primary btn-block" onclick="adicionarProvadorAdmin(${voltarAttr})">+ Adicionar</button>
+      </div>
+    </div>
+  </div>`;
+}
+function adicionarProvadorAdmin(numeroLoteParaVoltar){
+  const input = document.getElementById('fNovoProvador');
+  const nome = (input.value||'').trim();
+  if(!nome){ alert('Escreve o nome do provador.'); return; }
+  const listaAtual = listaProvadoresAtual();
+  if(listaAtual.includes(nome)){ alert('Esse nome já está na lista.'); return; }
+  listaAtual.push(nome);
+  guardarProvadoresNoServidor(listaAtual).then(()=> abrirGestaoProvadores(numeroLoteParaVoltar));
+}
+function removerProvadorAdmin(indice, numeroLoteParaVoltar){
+  const listaAtual = listaProvadoresAtual();
+  const nome = listaAtual[indice];
+  if(!confirm(`Remover "${nome}" da lista de provadores?`)) return;
+  listaAtual.splice(indice,1);
+  guardarProvadoresNoServidor(listaAtual).then(()=> abrirGestaoProvadores(numeroLoteParaVoltar));
 }
 /* ==================== ENTRADA DO PROVADOR (a app decide sozinha se é a 1ª, 2ª ou 3ª prova) ====================
    O provador já não escolhe "sou o Provador 1" ou "sou o Provador 2": escolhe só o nome. A app olha
@@ -1870,10 +2089,12 @@ function confirmarEntradaProvador(numero){
 }
 
 /* ==================== REGISTO PROVADOR (lista de frascos com aroma, mobile-friendly) ==================== */
-/* 14/09/2026: registo por toque direto. Até 50 frascos mostra-se uma grelha 1..N — o provador toca no
-   número do frasco em que encontrou aroma, em qualquer ordem (sem navegação forçada, sem escrever
-   números). Acima de 50 frascos mantém-se a entrada manual original (nº do frasco + aroma + Adicionar). */
-let ctxLote = null, ctxProvador = null, frascoAtivoGrid = null, chipManualSelecionado = null;
+/* 14/09/2026: registo por toque direto. Uma grelha 1..N — o provador toca no número do frasco em que
+   encontrou aroma, em qualquer ordem (sem navegação forçada, sem escrever números).
+   17/09/2026: para lotes com mais de 50 frascos (ex.: 100, 150, 200), a grelha passa a mostrar-se em
+   "ondas" de 50 de cada vez (navegação ◀ ▶), com numeração sempre contínua (a onda 2 mostra 51–100,
+   etc.) — substitui o antigo modo de entrada manual, que obrigava a escrever o nº do frasco à mão. */
+let ctxLote = null, ctxProvador = null, frascoAtivoGrid = null, ondaGridAtiva = 0;
 function labelProvador(p){ return p==='p1'?'Provador 1':(p==='p2'?'Provador 2':'Provador 3'); }
 function openRegistoModal(numero, provador){
   if(provador==='p2' && !state.lotes[numero].registos.p1.concluido) return;
@@ -1888,13 +2109,13 @@ function openRegistoModal(numero, provador){
   const loteChk = state.lotes[numero];
   if(loteChk.registos[provador].concluido){ return openRegistoReadOnly(numero, provador); }
   ctxLote = numero; ctxProvador = provador;
-  frascoAtivoGrid = null; chipManualSelecionado = null;
+  frascoAtivoGrid = null; ondaGridAtiva = 0;
   const lote = state.lotes[numero];
   const reg = lote.registos[provador];
   const total = lote.numeroFrascos || 50;
   const instrucao = total <= 50
     ? 'Toca no número do frasco assim que encontrares um aroma — podes tocar em qualquer ordem.'
-    : 'Indica o número do frasco e o aroma encontrado e toca em "+ Adicionar Frasco".';
+    : `Toca no número do frasco assim que encontrares um aroma — podes tocar em qualquer ordem. Os ${total} frascos aparecem em ondas de 50; usa as setas para mudar de onda.`;
   const modalRoot = document.getElementById('modalRoot');
   modalRoot.innerHTML = `
   <div class="overlay" id="overlayRegisto">
@@ -1921,18 +2142,12 @@ function openRegistoModal(numero, provador){
   </div>`;
   renderRegistoFrascos();
 }
-/* Dispatcher: grelha (<=50 frascos) vs entrada manual (>50 frascos) */
 function renderRegistoFrascos(){
   const el = document.getElementById('frascosArea');
   if(!el) return;
   const lote = state.lotes[ctxLote];
   const total = lote.numeroFrascos || 50;
-  if(total <= 50){
-    el.innerHTML = htmlGrelha(total);
-  } else {
-    el.innerHTML = htmlEntradaManual(total);
-    renderItensList();
-  }
+  el.innerHTML = htmlGrelha(total);
 }
 function itemFrasco(n){
   const reg = state.lotes[ctxLote].registos[ctxProvador];
@@ -1947,18 +2162,33 @@ function codAroma(it){
   if(it.outro) return 'OUTRO';
   return '';
 }
-/* ---- grelha de toque direto (<=50 frascos) ---- */
+/* ---- grelha de toque direto, paginada em ondas de 50 quando total > 50 ---- */
 function htmlGrelha(total){
   if(frascoAtivoGrid) return htmlSeletorAroma(frascoAtivoGrid, total);
-  // 1ª posição da grelha fica em branco (o frasco 1 avança para a 2ª posição), tal como no esquema
-  let tiles = '<div class="frasco-tile frasco-vazio" aria-hidden="true"></div>';
-  for(let n=1;n<=total;n++){
+  const totalOndas = Math.max(1, Math.ceil(total/50));
+  if(ondaGridAtiva >= totalOndas) ondaGridAtiva = totalOndas - 1;
+  if(ondaGridAtiva < 0) ondaGridAtiva = 0;
+  const inicio = ondaGridAtiva*50 + 1;
+  const fim = Math.min((ondaGridAtiva+1)*50, total);
+  // 1ª posição da grelha fica em branco na 1ª onda (o frasco 1 avança para a 2ª posição), tal como no esquema
+  let tiles = ondaGridAtiva===0 ? '<div class="frasco-tile frasco-vazio" aria-hidden="true"></div>' : '';
+  for(let n=inicio;n<=fim;n++){
     const it = itemFrasco(n);
     tiles += `<button type="button" class="frasco-tile ${it?'marcado':''}" onclick="abrirSeletorGrid(${n})">
       <span class="ft-num">${n}</span>${it?`<span class="ft-cod">${codAroma(it)}</span>`:''}
     </button>`;
   }
-  return `<div class="frasco-grid">${tiles}</div>`;
+  const nav = totalOndas > 1 ? `
+    <div class="onda-nav">
+      <button type="button" class="btn btn-sm" ${ondaGridAtiva===0?'disabled':''} onclick="mudarOndaGrid(-1)">◀</button>
+      <div class="onda-contador">Frascos ${inicio}–${fim}</div>
+      <button type="button" class="btn btn-sm" ${ondaGridAtiva>=totalOndas-1?'disabled':''} onclick="mudarOndaGrid(1)">▶</button>
+    </div>` : '';
+  return `${nav}<div class="frasco-grid">${tiles}</div>`;
+}
+function mudarOndaGrid(delta){
+  ondaGridAtiva += delta;
+  renderRegistoFrascos();
 }
 function htmlSeletorAroma(n, total){
   const it = itemFrasco(n);
@@ -1996,54 +2226,6 @@ function marcarSemAromaGrid(){
   state.lotes[ctxLote].atualizadoEm = new Date().toISOString();
   saveState();
   fecharSeletorGrid();
-}
-/* ---- entrada manual original (>50 frascos) ---- */
-function htmlEntradaManual(total){
-  return `
-    <div class="field"><label>Nº do Frasco</label><input id="fNumFrasco" type="number" min="1" max="${total}" placeholder="ex: 23"></div>
-    <div class="chip-toggle" id="chipToggleManual">
-      <button type="button" data-k="tcaF" onclick="toggleChipManual('tcaF')">TCA · Forte</button>
-      <button type="button" data-k="tcaP" onclick="toggleChipManual('tcaP')">TCA · Percetível</button>
-      <button type="button" data-k="mofoF" onclick="toggleChipManual('mofoF')">Mofo · Forte</button>
-      <button type="button" data-k="mofoP" onclick="toggleChipManual('mofoP')">Mofo · Percetível</button>
-      <button type="button" data-k="outro" onclick="toggleChipManual('outro')">Outro Aroma</button>
-    </div>
-    <div class="actions-row">
-      <button type="button" class="btn btn-primary btn-block" onclick="adicionarFrascoManual(${total})">+ Adicionar Frasco</button>
-    </div>
-    <div class="itens-list" id="itensList"></div>`;
-}
-function toggleChipManual(k){
-  chipManualSelecionado = (chipManualSelecionado===k) ? null : k;
-  document.querySelectorAll('#chipToggleManual button').forEach(b=>{
-    b.classList.toggle('on', b.dataset.k===chipManualSelecionado);
-  });
-}
-function adicionarFrascoManual(total){
-  const numEl = document.getElementById('fNumFrasco');
-  const n = parseInt(numEl.value);
-  if(!n || n<1 || n>total){ alert(`Indica um número de frasco entre 1 e ${total}.`); return; }
-  if(!chipManualSelecionado){ alert('Escolhe o aroma detetado.'); return; }
-  const reg = state.lotes[ctxLote].registos[ctxProvador];
-  reg.itens = reg.itens.filter(it=> it.frasco!==n);
-  const novoItem = { frasco:n, tcaF:false, tcaP:false, mofoF:false, mofoP:false, outro:false };
-  novoItem[chipManualSelecionado] = true;
-  reg.itens.push(novoItem);
-  reg.itens.sort((a,b)=>a.frasco-b.frasco);
-  state.lotes[ctxLote].atualizadoEm = new Date().toISOString();
-  saveState();
-  numEl.value = '';
-  chipManualSelecionado = null;
-  document.querySelectorAll('#chipToggleManual button').forEach(b=>b.classList.remove('on'));
-  renderItensList();
-  numEl.focus();
-}
-function removerFrasco(n){
-  const reg = state.lotes[ctxLote].registos[ctxProvador];
-  reg.itens = reg.itens.filter(it=> it.frasco !== n);
-  state.lotes[ctxLote].atualizadoEm = new Date().toISOString();
-  saveState();
-  renderItensList();
 }
 function resumoFlags(it){
   const parts=[];
