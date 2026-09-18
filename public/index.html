@@ -202,8 +202,7 @@ main{padding:14px 14px 10px;}
    passou) · WIP 2/2 = verde (os dois provadores já passaram — a Logística já pode levantar os
    frascos, mesmo que a decisão ainda esteja pendente) */
 .quad-estado-txt.e-planeado{background:rgba(255,255,255,.6);color:var(--text);}
-.quad-estado-txt.e-wip1{background:#EDB05E;color:var(--text);}
-.quad-estado-txt.e-wip2{background:#357246;color:#fff;}
+.quad-estado-txt.e-wip{background:#EDB05E;color:var(--text);}
 /* lote importado hoje mas só pode ser cheirado amanhã (D+1) — visível já, mas assinalado como ainda não disponível */
 .quad-lote.futuro{opacity:.6;border-style:dashed;}
 
@@ -517,7 +516,8 @@ const ADMIN_PASSWORD = 'harv81admin';
 function pedirAcessoAdmin(aoConfirmar){
   const tentativa = prompt('Palavra-passe de administração:');
   if(tentativa === null) return; // cancelou
-  if(tentativa !== ADMIN_PASSWORD){ alert('Palavra-passe incorreta.'); return; }
+  // Insensível a maiúsculas/minúsculas — no telemóvel o teclado põe maiúscula na 1ª letra sozinho.
+  if((tentativa||'').trim().toLowerCase() !== ADMIN_PASSWORD.toLowerCase()){ alert('Palavra-passe incorreta.'); return; }
   aoConfirmar();
 }
 
@@ -1088,15 +1088,11 @@ function renderGradeLotes(){
     // estado escrito por extenso no próprio quadrado (não uma barra abstrata): PLANEADO = ninguém
     // começou ainda · WIP = já há provador a trabalhar, mas ainda não concluiu. Um lote concluído
     // nunca aparece aqui — sai logo desta grelha (ver lotesDeHoje) e passa a viver no Histórico.
-    // Dentro do WIP, a cor da barra distingue quantos provadores já passaram fisicamente pelo lote:
-    // 1 de 2 (amarelado/alaranjado) vs 2 de 2 (verde — já dá para a Logística levantar os frascos,
-    // mesmo que a decisão ainda esteja pendente).
-    const p1Feito = !!(l.registos.p1 && l.registos.p1.concluido);
-    const p2Feito = !!(l.registos.p2 && l.registos.p2.concluido);
+    // (18/09/2026: voltou a ser uma única cor amarelada para todo o WIP — a distinção 1/2 provadores
+    // com verde foi removida a pedido.)
     let estadoClasse, estadoTxt;
     if(!l.provador1){ estadoClasse = 'e-planeado'; estadoTxt = 'Planeado'; }
-    else if(p1Feito && p2Feito){ estadoClasse = 'e-wip2'; estadoTxt = 'WIP'; }
-    else { estadoClasse = 'e-wip1'; estadoTxt = 'WIP'; }
+    else { estadoClasse = 'e-wip'; estadoTxt = 'WIP'; }
     const estadoHtml = `<span class="quad-estado-txt ${estadoClasse}">${estadoTxt}</span>`;
     const tituloEstado = STATUS_META[st]?STATUS_META[st].label:'';
     // importado hoje mas só pode ser cheirado a partir de amanhã (D+1) — mostra-se já, mas visualmente assinalado
