@@ -161,6 +161,16 @@ main{padding:14px 14px 10px;}
 .tile.t-rej .n, .tile.t-rej .lbl{color:var(--red);}
 .tile.active{outline:2.5px solid var(--accent-dark);}
 
+/* Resumo do estado geral (aberto a partir do botão "+"): 4 quadrados — Total/Por Abrir/Aberto/Fechado */
+.resumo-estado-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px;}
+.resumo-estado-tile{border-radius:12px;padding:18px 8px;text-align:center;border:2px solid var(--border);}
+.resumo-estado-tile .re-num{font-size:28px;font-weight:800;line-height:1.1;}
+.resumo-estado-tile .re-label{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.03em;margin-top:4px;opacity:.85;}
+.resumo-estado-tile.re-total{background:var(--panel);border-color:var(--border);color:var(--text);}
+.resumo-estado-tile.re-planeado{background:rgba(255,255,255,.6);border-color:var(--border);color:var(--text);}
+.resumo-estado-tile.re-aberto{background:#EDB05E;border-color:#c8934a;color:var(--text);}
+.resumo-estado-tile.re-fechado{background:var(--green-bg);border-color:var(--green);color:var(--green);}
+
 /* Legenda de cores + grelha de quadrados (1 quadrado = 1 lote de hoje) */
 .legend-cores{display:flex;gap:14px;flex-wrap:wrap;margin:2px 2px 14px;font-size:12px;color:var(--muted);font-weight:600;}
 .lg-item{display:flex;align-items:center;gap:5px;}
@@ -478,7 +488,7 @@ textarea#taPrioridadesInput{min-height:110px;font-family:ui-monospace,monospace;
       <button class="nav-btn active" id="navInicio" onclick="switchView('inicio')">Lotes</button>
       <button class="nav-btn" id="navLab" onclick="switchView('lab')">LAB</button>
     </div>
-    <button class="nav-fab" type="button" title="Ainda sem ação definida">+</button>
+    <button class="nav-fab" type="button" onclick="abrirResumoEstado()" title="Estado geral dos sensoriais">+</button>
     <div class="nav-side">
       <button class="nav-btn" id="navLevantamento" onclick="switchView('levantamento')">Logística</button>
     </div>
@@ -1310,6 +1320,36 @@ function grupoLoteLAB(l){
   if(l.decisao.final) return l.decisao.data===hojeStr() ? 'concluidos' : 'historico';
   if(!l.provador1) return 'planeados';
   return 'wip';
+}
+/* ==================== RESUMO DO ESTADO (botão "+") ====================
+   Visão geral rápida, sem precisar de percorrer o LAB: quantos lotes há no total (ativos + já
+   fechados hoje), quantos ainda ninguém abriu, quantos já têm pelo menos um provador a decorrer,
+   e quantos já fecharam hoje. Serve de confirmação visual de que nenhum lote fica "preso" a meio —
+   todo o lote que começa em "Por Abrir" tem de acabar em "Fechado". */
+function contarEstadoLotes(){
+  const relevantes = todosLotes().filter(l=> grupoLoteLAB(l)!=='historico');
+  const porAbrir = relevantes.filter(l=> grupoLoteLAB(l)==='planeados').length;
+  const aberto = relevantes.filter(l=> grupoLoteLAB(l)==='wip').length;
+  const fechado = relevantes.filter(l=> grupoLoteLAB(l)==='concluidos').length;
+  return { total: relevantes.length, porAbrir, aberto, fechado };
+}
+function abrirResumoEstado(){
+  const c = contarEstadoLotes();
+  const modalRoot = document.getElementById('modalRoot');
+  modalRoot.innerHTML = `
+  <div class="overlay" id="overlayResumoEstado">
+    <div class="modal">
+      <button class="modal-close" onclick="closeModal('overlayResumoEstado')">&times;</button>
+      <h2>Estado dos Sensoriais</h2>
+      <div class="sub">Lotes ainda ativos, mais os já fechados hoje.</div>
+      <div class="resumo-estado-grid">
+        <div class="resumo-estado-tile re-total"><div class="re-num">${c.total}</div><div class="re-label">Total de Lotes</div></div>
+        <div class="resumo-estado-tile re-planeado"><div class="re-num">${c.porAbrir}/${c.total}</div><div class="re-label">Por Abrir</div></div>
+        <div class="resumo-estado-tile re-aberto"><div class="re-num">${c.aberto}/${c.total}</div><div class="re-label">Aberto</div></div>
+        <div class="resumo-estado-tile re-fechado"><div class="re-num">${c.fechado}/${c.total}</div><div class="re-label">Fechado</div></div>
+      </div>
+    </div>
+  </div>`;
 }
 function letraPrioHtml(l){
   return l.prioridade==='vermelho' ? '<span class="letra-prio l-u">U</span>' : (l.prioridade==='amarelo' ? '<span class="letra-prio l-p">P</span>' : '');
