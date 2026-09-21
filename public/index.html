@@ -2037,7 +2037,7 @@ function openLoteDetail(numero){
   if(aindaNaoDisponivel){
     entradaHtml = `<div class="empty-note" style="padding:0 0 8px;font-weight:700;color:var(--yellow);">● Importado hoje — só pode ser cheirado a partir de ${lote.diaPrevisto.slice(8,10)}/${lote.diaPrevisto.slice(5,7)}/${lote.diaPrevisto.slice(0,4)}.</div>`;
   } else if(slotSeguinte && faltamMin>0){
-    entradaHtml = `<div class="empty-note" style="padding:6px 0;">Aguarda mais ${faltamMin} minuto(s) — mínimo de 30 min entre provadores, para não perder o foco olfativo.</div>`;
+    entradaHtml = `<div class="empty-note" style="padding:6px 0;">Aguarda mais ${faltamMin} minuto(s).</div>`;
   } else if(slotSeguinte){
     const nomeCampoSeg = nomeCampoSlot(slotSeguinte);
     const provaEmCurso = lote[nomeCampoSeg] && !lote.registos[slotSeguinte].concluido;
