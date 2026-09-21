@@ -388,7 +388,7 @@ legend{font-size:11.5px;font-weight:800;color:var(--muted);padding:0 6px;text-tr
 .photo-fullscreen{position:fixed;inset:0;background:rgba(0,0,0,.9);display:flex;align-items:center;justify-content:center;z-index:200;padding:20px;}
 .photo-fullscreen img{max-width:100%;max-height:100%;border-radius:6px;}
 
-textarea#taPrioridadesInput{min-height:110px;font-family:ui-monospace,monospace;font-size:12.5px;}
+textarea#taPrioridadesInputInicio{min-height:110px;font-family:ui-monospace,monospace;font-size:12.5px;}
 
 .toolbar-mini{display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;}
 .toolbar-mini button{flex:1;min-width:auto;}
@@ -477,21 +477,9 @@ textarea#taPrioridadesInput{min-height:110px;font-family:ui-monospace,monospace;
     </section>
 
     <section id="view-levantamento" class="view hidden">
-      <div class="section-title">Importar lista do planeamento</div>
-      <div class="toolbar-mini">
-        <button class="btn btn-sm" onclick="toggleImportBox()">Colar lista recebida por email</button>
-      </div>
-      <div id="importBox" class="hidden" style="margin-bottom:14px;">
-        <div class="field">
-          <label>Cola aqui o texto do email (um lote por linha; escreve URGENTE na linha para prioridade máxima)</label>
-          <textarea id="taPrioridadesInput" placeholder="LT02364212 URGENTE&#10;LT02364099 URGENTE&#10;LT02363656&#10;LT02364105"></textarea>
-        </div>
-        <button class="btn btn-primary btn-block" onclick="importarPrioridades()">Importar / Atualizar Prioridades</button>
-      </div>
-
       <div class="section-title">Levantamento de Material — Lotes com Frascos a Levantar</div>
       <div class="legend-cores" style="margin-top:-6px;">
-        <span class="lg-item">Para a Logística: quais os frascos a recolher e lavar depois de cada lote concluído com TCA/Mofo. "Por levantar" mostra só os de hoje — limpa sozinho todos os dias.</span>
+        <span class="lg-item">Para a Logística: quais os frascos a recolher e lavar depois de cada lote concluído com TCA/Mofo. Lê o código de barras da etiqueta para ver os frascos de um lote — a lista toda só aparece no separador "Histórico".</span>
       </div>
       <div class="toolbar-mini no-print">
         <button class="btn btn-sm hist-filtro on" data-lf="pendentes" onclick="filtrarLevantamento('pendentes')">Por levantar (hoje)</button>
@@ -1330,15 +1318,15 @@ function importarOrdensExcel(input){
 }
 document.getElementById('fileOrdens').addEventListener('change', function(){ importarOrdensExcel(this); });
 /* ==================== VIEW: PRIORIDADES ==================== */
-/* 21/09/2026: o mesmo atalho "Colar lista recebida por email" passou a existir em 2 sítios — no ecrã
-   Lotes (importBoxInicio/taPrioridadesInputInicio) e no ecrã Logística (importBox/taPrioridadesInput,
-   o original). São só 2 caixas independentes que chamam a MESMA lógica de importação — por isso ambas
-   as funções recebem o id da caixa/textarea a usar (com o id antigo como valor por omissão). */
-function toggleImportBox(boxId){ document.getElementById(boxId||'importBox').classList.toggle('hidden'); }
+/* 21/09/2026: "Colar lista recebida por email" tinha passado a existir também no ecrã Logística, mas
+   voltou a viver só no ecrã Lotes (importBoxInicio/taPrioridadesInputInicio) — a pedido da Joana, para
+   não ficar duplicado. As funções continuam a aceitar o id da caixa/textarea por parâmetro (útil se um
+   dia voltar a haver mais que um sítio a chamá-las), com os ids do ecrã Lotes como valor por omissão. */
+function toggleImportBox(boxId){ document.getElementById(boxId||'importBoxInicio').classList.toggle('hidden'); }
 function importarPrioridades(textareaId){
   // Regra (11/09/2026): não se criam lotes novos por aqui — só pelo "Importar Ordens (Excel)".
   // Esta caixa só serve para marcar prioridade/Bartops em lotes que já existem.
-  textareaId = textareaId || 'taPrioridadesInput';
+  textareaId = textareaId || 'taPrioridadesInputInicio';
   const txt = document.getElementById(textareaId).value;
   const linhas = txt.split('\n').map(l=>l.trim()).filter(Boolean);
   let n=0;
@@ -1602,12 +1590,20 @@ function renderLevantamentoCard(l){
     </fieldset>
   </div>`;
 }
+/* 21/09/2026: a pedido da Joana, "Por levantar (hoje)" deixou de mostrar logo a lista toda de cartões
+   (ficava com informação a mais à vista de uma vez). Agora só se veem os frascos a levantar de um
+   lote de cada vez, ao ler o código de barras da etiqueta (o cartão aparece dentro do próprio leitor,
+   ver atualizarResultadoLevantamentoEmDireto). A listagem completa, com todos os cartões, continua a
+   existir tal e qual como antes — só passou a viver exclusivamente no separador "Histórico". */
 function renderListaLevantamento(){
   const el = document.getElementById('listaLevantamento');
-  let lotes = todosLotes().filter(l=> l.decisao.final==='concluido' && l.decisao.temFrascosParaLevantar);
-  if(filtroLevantamento==='pendentes') lotes = lotes.filter(l=> (l.decisao.data||'').slice(0,10) === hojeStr());
-  lotes.sort((a,b)=> (b.decisao.data||'').localeCompare(a.decisao.data||''));
-  el.innerHTML = lotes.length ? lotes.map(renderLevantamentoCard).join('') : `<div class="empty-note">${filtroLevantamento==='pendentes' ? 'Sem lotes com frascos a levantar hoje.' : 'Ainda sem lotes no histórico.'}</div>`;
+  if(filtroLevantamento==='pendentes'){
+    el.innerHTML = `<div class="empty-note">Usa "Ler código de barras da etiqueta" para veres os frascos a levantar de cada lote, um a um.</div>`;
+    return;
+  }
+  const lotes = todosLotes().filter(l=> l.decisao.final==='concluido' && l.decisao.temFrascosParaLevantar)
+    .sort((a,b)=> (b.decisao.data||'').localeCompare(a.decisao.data||''));
+  el.innerHTML = lotes.length ? lotes.map(renderLevantamentoCard).join('') : `<div class="empty-note">Ainda sem lotes no histórico.</div>`;
 }
 
 /* ==================== NAV ==================== */
@@ -1648,36 +1644,43 @@ function atualizarBadgeP3(){
   if(contagem) contagem.textContent = n>9 ? '9+' : String(n);
   if(btn) btn.classList.toggle('hidden', n===0);
 }
-// Abre a lista de lotes à espera do 3º provador — se só houver um, abre-o logo; com vários, mostra
-// um mini-modal a escolher (reaproveita o espaço do botão "Gerar lote de teste (DEV)" no ecrã Lotes).
+// Abre a lista de lotes à espera do 3º provador — SEMPRE em modal (mesmo com só 1 pendente), para
+// que "Concluir Todos"/"Concluir Selecionados" estejam sempre acessíveis (22/09/2026: antes, com só
+// 1 lote pendente, ia-se logo para a ficha do lote e não dava para usar o atalho — corrigido a pedido
+// da Joana, que teve de concluir manualmente um lote por causa disto).
 function abrirAlertaProvador3(){
   const pendentes = lotesAguardaP3();
   if(!pendentes.length) return;
-  if(pendentes.length===1){ openLoteDetail(pendentes[0].numeroLote); return; }
   const modalRoot = document.getElementById('modalRoot');
   modalRoot.innerHTML = `
   <div class="overlay" id="overlayAlertaP3">
     <div class="modal">
       <button class="modal-close" onclick="closeModal('overlayAlertaP3')">&times;</button>
       <h2>Lotes à espera do 3º provador</h2>
-      <div class="sub">Toca num lote para abrir e fazer o registo do Provador 3. Se já cheiraste todos e nenhum tinha aroma a registar, usa "Concluir Todos".</div>
-      <div class="actions-row" style="margin-bottom:10px;">
-        <button class="btn btn-primary btn-block" onclick="concluirTodosP3()">Concluir Todos (${pendentes.length}) — sem novos aromas</button>
+      <div class="sub">Marca os que já cheiraste sem encontrar aroma nenhum e usa "Concluir Selecionados" (ou "Concluir Todos" se forem todos). Toca no nº do lote para abrir e fazer o registo completo do Provador 3.</div>
+      <div class="actions-row" style="margin-bottom:10px;flex-wrap:wrap;gap:8px;">
+        <button class="btn btn-primary" onclick="concluirTodosP3()">Concluir Todos (${pendentes.length})</button>
+        <button class="btn btn-primary" onclick="concluirSelecionadosP3()">Concluir Selecionados</button>
       </div>
-      <div class="actions-row" style="flex-wrap:wrap;gap:8px;">
-        ${pendentes.map(l=>`<button class="btn btn-sm btn-primary" onclick="closeModal('overlayAlertaP3');openLoteDetail('${escapeHtml(l.numeroLote)}')">${escapeHtml(l.numeroLote)}</button>`).join('')}
+      <div class="p3-lista" style="display:flex;flex-direction:column;gap:6px;">
+        ${pendentes.map(l=>`
+        <div class="lab-lote-row">
+          <input type="checkbox" class="lab-lote-check p3-lote-check" data-lote="${escapeHtml(l.numeroLote)}">
+          <button class="btn btn-sm btn-primary" style="flex:1;" onclick="closeModal('overlayAlertaP3');openLoteDetail('${escapeHtml(l.numeroLote)}')">${escapeHtml(l.numeroLote)}</button>
+        </div>`).join('')}
       </div>
     </div>
   </div>`;
 }
-/* 21/09/2026: atalho para o 3º provador concluir de uma vez todos os lotes pendentes cujo registo
-   é só uma formalidade (já cheirados fisicamente, sem qualquer aroma novo a registar). Não pede nome
-   (fica em branco — finalizarAutomatico usa "Provador 3" como rótulo nesse caso) e ignora a regra dos
-   30 minutos entre provadores, por ser uma ação administrativa rápida feita pelo próprio 3º provador.
-   Cada lote continua a passar pelo motor de decisão normal (tentarAutoFinalizar), que fecha sozinho
-   a prova como "concluída" e calcula, à parte, se fica com frascos para levantar consoante o que já
-   estava registado por P1/P2 — todos vão para Concluídos do LAB; os que tiverem frascos a levantar
-   aparecem também na Logística. */
+/* 21/09/2026 (revisto 22/09/2026): atalhos para o 3º provador concluir lotes pendentes cujo registo é
+   só uma formalidade (já cheirados fisicamente, sem qualquer aroma novo a registar) — "Concluir Todos"
+   processa toda a lista de pendentes; "Concluir Selecionados" processa só os marcados com a caixa, para
+   quando só ALGUNS já foram cheirados e os outros precisam mesmo de ser abertos e provados a sério.
+   Nenhum dos dois pede nome (fica em branco — finalizarAutomatico usa "Provador 3" como rótulo nesse
+   caso) nem respeita a regra dos 30 minutos entre provadores, por serem ações administrativas rápidas
+   feitas pelo próprio 3º provador. Cada lote continua a passar pelo motor de decisão normal
+   (tentarAutoFinalizar), que fecha sozinho a prova como "concluída" e calcula, à parte, se fica com
+   frascos para levantar consoante o que já estava registado por P1/P2. */
 function concluirTodosP3(){
   const todosPendentes = lotesAguardaP3();
   const pendentes = todosPendentes.filter(l=> !loteBloqueadoAteAmanha(l));
@@ -1685,6 +1688,19 @@ function concluirTodosP3(){
   const bloqueados = todosPendentes.length - pendentes.length;
   let aviso = `Vais concluir a prova do Provador 3 em ${pendentes.length} lote(s) de uma vez, sem registar nenhum aroma novo (assume-se que já foram cheirados e nada foi encontrado). Esta ação não pode ser desfeita.`;
   if(bloqueados>0) aviso += `\n\n(${bloqueados} lote(s) ficam de fora por ainda não poderem ser cheirados — só amanhã.)`;
+  executarConclusaoP3(pendentes, aviso);
+}
+function concluirSelecionadosP3(){
+  const marcados = [...document.querySelectorAll('#overlayAlertaP3 .p3-lote-check:checked')].map(c=> c.dataset.lote);
+  if(!marcados.length){ alert('Marca pelo menos um lote (caixa ao lado do nº) para concluir.'); return; }
+  const bloqueados = marcados.filter(n=> state.lotes[n] && loteBloqueadoAteAmanha(state.lotes[n]));
+  const pendentes = marcados.filter(n=> state.lotes[n] && !loteBloqueadoAteAmanha(state.lotes[n])).map(n=> state.lotes[n]);
+  if(!pendentes.length){ alert('O(s) lote(s) marcado(s) ainda não podem ser cheirados — só amanhã.'); return; }
+  let aviso = `Vais concluir a prova do Provador 3 em ${pendentes.length} lote(s) selecionado(s), sem registar nenhum aroma novo (assume-se que já foram cheirados e nada foi encontrado). Esta ação não pode ser desfeita.`;
+  if(bloqueados.length>0) aviso += `\n\n(${bloqueados.length} lote(s) marcado(s) ficam de fora por ainda não poderem ser cheirados — só amanhã.)`;
+  executarConclusaoP3(pendentes, aviso);
+}
+function executarConclusaoP3(pendentes, aviso){
   if(!confirm(aviso)) return;
   const agora = new Date().toISOString();
   pendentes.forEach(l=>{
