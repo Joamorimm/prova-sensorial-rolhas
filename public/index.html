@@ -566,6 +566,17 @@ function garantirCamposNovos(l){
   if(l.provador1 && !l.provaAbertaEm){
     l.provaAbertaEm = (l.registos.p1 && l.registos.p1.assinadoEm) || l.atualizadoEm || l.criadoEm || new Date().toISOString();
   }
+  // Migração (21/09/2026): lotes decididos ANTES de "aprovado"/"rejeitado" deixarem de existir ainda
+  // têm essas palavras gravadas em decisao.final (vindas do servidor/localStorage antigo). Sem isto,
+  // o resto da app (que só reconhece 'concluido') trata-os como "ainda não decidido" — é o que fazia
+  // o leitor de código de barras da Logística dizer "não tem frascos para levantar (ainda não foi
+  // decidido)" para lotes que na realidade já estavam concluídos há muito tempo.
+  // 'rejeitado' tinha TCA/Mofo a mais (ia para a Logística) -> agora concluido + temFrascosParaLevantar=true.
+  // 'aprovado' não tinha nada a levantar -> agora concluido + temFrascosParaLevantar=false.
+  if(l.decisao && (l.decisao.final==='aprovado' || l.decisao.final==='rejeitado')){
+    l.decisao.temFrascosParaLevantar = l.decisao.final==='rejeitado';
+    l.decisao.final = 'concluido';
+  }
   return l;
 }
 function migrarTodosLotes(lotes){
@@ -815,15 +826,19 @@ function gerarLoteTeste(){
    21/09/2026 — deixou de haver "aprovado"/"rejeitado": só existe "concluído", ver finalizarAutomatico):
    1. Divergência de CONJUNTO — um frasco assinalado por um provador e não pelo outro — só bloqueia o
       lote (chama logo o Provador 3, sem passar por Revisão Conjunta) quando esse frasco é Forte. Uma
-      divergência de conjunto só Percetível já não bloqueia — conta para o total na mesma.
+      divergência de conjunto só Percetível já não bloqueia (22/09/2026: também deixou de contar para
+      o total — um discordante nunca conta, seja Forte ou Percetível).
       Divergência de TIPO no MESMO frasco (ex.: P1 diz Mofo, P2 diz TCA) também NÃO bloqueia — resolve-se
       automaticamente pela severidade TCA > Mofo > Outro (função tipoFrasco/combinarTipo).
-   2. Sem nenhum frasco discordante Forte por resolver, o LAB decide com base nos totais de frascos
-      TCA e Mofo em que os dois provadores COINCIDEM (mais os discordantes só Percetíveis, que contam
-      na mesma) — já não é a união simples de "qualquer um assinalou".
-   3. Regra geral: 3+ frascos TCA ou 4+ frascos Mofo (pela contagem acima) conclui a prova com frascos
-      para levantar (segue para a Logística). Abaixo disso — incluindo zero — conclui na mesma, mas
-      sem nada a levantar. Em ambos os casos a prova fica simplesmente "Concluída". */
+   2. Sem nenhum frasco discordante Forte por resolver, o LAB decide com base SÓ nos totais de frascos
+      TCA e Mofo em que os dois provadores COINCIDEM (22/09/2026: os discordantes, mesmo só Percetíveis,
+      já não contam para este total) — já não é a união simples de "qualquer um assinalou".
+   3. Regra geral: 3+ frascos TCA EM COMUM ou 4+ frascos Mofo EM COMUM (pela contagem acima) conclui a
+      prova com frascos para levantar (segue para a Logística). Abaixo disso — incluindo zero — conclui
+      na mesma, mas sem nada a levantar. Em ambos os casos a prova fica simplesmente "Concluída".
+      Importante: a Logística continua a mostrar TODOS os frascos alguma vez assinalados (comuns e
+      discordantes, por qualquer provador) — a contagem "em comum" só decide SE há algo para levantar,
+      não filtra QUAIS frascos aparecem para recolher (ver uniaoDetalhePorFrasco/frascosAssinaladosDe). */
 function itensToMap(itens){
   const m = {};
   (itens||[]).forEach(it=> m[it.frasco] = it);
@@ -902,19 +917,25 @@ function uniaoDetalhePorFrasco(lote){
 }
 
 /* ==================== REGRA AUTOMÁTICA DO LAB (definida com a Joana em 11/09/2026;
-   limiares e critério de discordância revistos a 18/09/2026; 21/09/2026 — já não existe
-   aprovado/rejeitado, ver nota abaixo) ====================
+   limiares e critério de discordância revistos a 18/09/2026 e a 22/09/2026; 21/09/2026 — já não
+   existe aprovado/rejeitado, ver nota abaixo) ====================
    O LAB deixou de "decidir" — passou só a receber informação. A app decide sozinha assim que P1+P2
    ficam resolvidos (sem nenhum frasco discordante Forte por resolver):
-     - 0 frascos TCA/Mofo (contando só coincidências entre P1+P2, mais discordâncias só Percetíveis —
-       "Outro Aroma" nunca conta) → prova CONCLUÍDA, sem frascos para levantar.
-     - 3+ frascos TCA, OU 4+ frascos Mofo → prova CONCLUÍDA, com frascos para levantar (segue para a
-       Logística).
-     - Abaixo desses limiares (ex.: 1-2 TCA, 1-3 Mofo) → também fecha sozinho, CONCLUÍDA sem nada a
-       levantar.
+     - 0 frascos TCA/Mofo EM COMUM entre P1+P2 (22/09/2026: discordantes — só um provador assinalou,
+       Forte ou Percetível — nunca contam para este total; "Outro Aroma" também nunca conta) → prova
+       CONCLUÍDA, sem frascos para levantar.
+     - 3+ frascos TCA em comum, OU 4+ frascos Mofo em comum → prova CONCLUÍDA, com frascos para
+       levantar (segue para a Logística).
+     - Abaixo desses limiares (ex.: 1-2 TCA em comum, 1-3 Mofo em comum) → também fecha sozinho,
+       CONCLUÍDA sem nada a levantar.
      - Qualquer frasco DISCORDANTE (só um provador assinalou) que seja Forte → não decide sozinha: vai
        a CONFRONTO — só o 3º provador desempata, o LAB não participa nesta decisão. Um discordante só
-       Percetível não bloqueia nada — entra direto na contagem acima.
+       Percetível não bloqueia nada, mas também não conta para o total — é ignorado para efeitos desta
+       contagem (deixou de "contar na mesma" como antes de 22/09/2026).
+   Nota: mesmo quando um lote conclui "com frascos para levantar", a Logística mostra TODOS os frascos
+   alguma vez assinalados por qualquer provador — comuns e discordantes — não só os que contaram para o
+   limiar (ver uniaoDetalhePorFrasco/frascosAssinaladosDe). A contagem "em comum" decide SE há algo a
+   levantar; não filtra QUAIS frascos aparecem para recolher.
    21/09/2026: a app deixou de ter um "veredicto" (aprovado/rejeitado) — existe só UM estado final,
    "concluído" (lote.decisao.final==='concluido'). O que antes decidia aprovado vs. rejeitado passou a
    ser só um facto separado, lote.decisao.temFrascosParaLevantar (true/false), que a Logística usa
@@ -962,13 +983,18 @@ function uniaoTallyDetalhada(lote){
   const contaveis = tcaForte + tcaPercetivel + mofoForte + mofoPercetivel; // "Outro Aroma" não conta
   return { tcaForte, tcaPercetivel, mofoForte, mofoPercetivel, outros, contaveis };
 }
-/* Análise só de P1+P2 (antes do 3º provador), com o critério novo pedido pela Joana a 18/09/2026:
-   - Frasco marcado pelos DOIS (coincidente) → conta sempre, seja qual for a força (Forte/Percetível);
-     se os tipos diferirem entre os dois (ex.: um diz TCA, outro Mofo), resolve-se por severidade.
-   - Frasco marcado só por UM (discordante):
-       · Forte → não conta ainda; marca temDiscordanteForte=true (a decisão espera pelo 3º provador).
-       · Percetível ou Outro → conta na mesma, como se fosse coincidente (não bloqueia nada).
-   "Outro Aroma" nunca entra nos totais de tca/mofo. */
+/* Análise só de P1+P2 (antes do 3º provador). Critério revisto pela Joana a 22/09/2026:
+   - Para a CONCLUSÃO DA PROVA (decidir se há frascos para levantar), só interessam os frascos EM COMUM
+     — marcados pelos DOIS provadores. Contam sempre, seja qual for a força (Forte/Percetível); se os
+     tipos diferirem entre os dois (ex.: um diz TCA, outro Mofo), resolve-se por severidade.
+   - Frasco marcado só por UM (discordante) NUNCA conta para o total de tca/mofo, seja Forte ou
+     Percetível — deixou de "contar na mesma" como antes (18/09/2026). Só o discordante FORTE continua
+     a escalar para o 3º provador (marca temDiscordanteForte=true); o discordante Percetível não conta
+     e não bloqueia nada — é como se não tivesse acontecido para efeitos desta contagem.
+   "Outro Aroma" nunca entra nos totais de tca/mofo.
+   (Nota: os frascos discordantes continuam a aparecer na Logística se o lote acabar com frascos para
+   levantar — ver frascosAssinaladosDe/uniaoDetalhePorFrasco, que junta TUDO o que foi assinalado por
+   qualquer provador, comum ou não, para efeitos de recolha física.) */
 function analiseCoincidenciaP1P2(lote){
   const m1 = itensToMap(lote.registos.p1.itens);
   const m2 = itensToMap(lote.registos.p2.itens);
@@ -976,13 +1002,14 @@ function analiseCoincidenciaP1P2(lote){
   let tca=0, mofo=0, outros=0, temDiscordanteForte=false;
   frascos.forEach(n=>{
     const it1 = m1[n], it2 = m2[n];
-    let tipo;
-    if(it1 && it2){
-      tipo = combinarTipoDetalhado([tipoFrascoDetalhado(it1), tipoFrascoDetalhado(it2)].filter(Boolean));
-    } else {
-      tipo = tipoFrascoDetalhado(it1||it2);
-      if(tipo==='tcaForte' || tipo==='mofoForte'){ temDiscordanteForte = true; return; }
+    if(!(it1 && it2)){
+      // discordante (só um provador marcou este frasco) — nunca conta para o total; só o Forte escala
+      const tipoDiscordante = tipoFrascoDetalhado(it1||it2);
+      if(tipoDiscordante==='tcaForte' || tipoDiscordante==='mofoForte') temDiscordanteForte = true;
+      return;
     }
+    // comum (os dois marcaram o mesmo frasco) — conta sempre, resolvendo o tipo por severidade
+    const tipo = combinarTipoDetalhado([tipoFrascoDetalhado(it1), tipoFrascoDetalhado(it2)].filter(Boolean));
     if(tipo==='tcaForte'||tipo==='tcaPercetivel') tca++;
     else if(tipo==='mofoForte'||tipo==='mofoPercetivel') mofo++;
     else if(tipo==='outro') outros++;
