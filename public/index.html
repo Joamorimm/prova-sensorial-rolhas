@@ -451,13 +451,11 @@ textarea#taPrioridadesInputInicio{min-height:110px;font-family:ui-monospace,mono
       <div class="lab-colunas">
         <div class="lab-col">
           <div class="lab-col-titulo">Planeados <span class="n" id="labContPlaneados">0</span>
-            <button type="button" class="lab-col-copy no-print" onclick="copiarColunaLAB('planeados', this)" title="Copiar números dos lotes — um por linha, para colar diretamente numa coluna no Excel. Marca as caixas para copiar e assinalar (roxo) só alguns lotes como já enviados ao LAB.">Copiar</button>
           </div>
           <div class="lab-col-lista" id="labColPlaneados"></div>
         </div>
         <div class="lab-col">
           <div class="lab-col-titulo">WIP <span class="n" id="labContWip">0</span>
-            <button type="button" class="lab-col-copy no-print" onclick="copiarColunaLAB('wip', this)" title="Copiar números dos lotes — um por linha, para colar diretamente numa coluna no Excel. Marca as caixas para copiar e assinalar (roxo) só alguns lotes como já enviados ao LAB.">Copiar</button>
           </div>
           <div class="lab-col-lista" id="labColWip"></div>
         </div>
@@ -1121,7 +1119,11 @@ function tentarAutoFinalizar(numero){
   return true;
 }
 function computeStatus(lote){
-  if(lote.decisao.final) return lote.decisao.final; // só 'concluido'
+  // Blindagem extra (22/09/2026): qualquer decisao.final gravado — mesmo um valor antigo tipo
+  // "aprovado"/"rejeitado" que por algum motivo não tenha passado pela migração de
+  // garantirCamposNovos — significa sempre "já foi decidido", ou seja "concluido". Isto evita que
+  // apareça texto antigo tipo "Estado atual: rejeitado" em qualquer ecrã.
+  if(lote.decisao.final) return 'concluido';
   const p1ok = lote.registos.p1.concluido, p2ok = lote.registos.p2.concluido;
   if(!p1ok) return 'prep';
   if(!p2ok) return 'p2';
@@ -1400,11 +1402,18 @@ function importarPrioridades(textareaId){
    lado com o nº de cada lote (e a letra U/P quando o lote já tinha sido identificado como Urgente
    ou Prioritário na importação). Sem colunas de Data/Prioridade por extenso/Provadores à vista —
    essa informação vive dentro da ficha do lote, que se abre ao tocar no número. Concluídos mostra
-   os lotes decididos hoje; ao fim desse dia, o lote sai daqui e passa a viver no Histórico (arquivo
-   à parte, com mais detalhe e exportação CSV, para quem precisar de consultar o histórico completo). */
+   os lotes cujo DIA DE TRABALHO (diaPrevisto, o dia em que ficam disponíveis para os provadores) é
+   hoje; assim que esse dia passa, o lote sai daqui e passa a viver no Histórico (arquivo à parte, com
+   mais detalhe e exportação CSV, para quem precisar de consultar o histórico completo).
+   22/09/2026: passou a usar-se diaPrevisto em vez da data em que a decisão foi de facto registada no
+   sistema (decisao.data) — um lote que ficou parado dias à espera do 3º provador e só foi concluído
+   mais tarde não deve continuar a aparecer como "concluído hoje" só por ter sido fechado hoje; o que
+   importa é o dia para que foi preparado. Isto só se aplica a lotes já decididos (decisao.final
+   preenchido) — um lote ainda à espera do 3º provador (sem decisão) continua sempre em WIP, nunca é
+   "empurrado" para Concluídos/Histórico só por o diaPrevisto ter passado. */
 function prioLetraLAB(p){ return p==='vermelho'?'U':(p==='amarelo'?'P':'Normal'); }
 function grupoLoteLAB(l){
-  if(l.decisao.final) return l.decisao.data===hojeStr() ? 'concluidos' : 'historico';
+  if(l.decisao.final) return l.diaPrevisto===hojeStr() ? 'concluidos' : 'historico';
   if(!l.provador1) return 'planeados';
   return 'wip';
 }
@@ -1446,7 +1455,7 @@ let labSelecionados = new Set();
 function toggleSelecaoLAB(numero, checkbox){
   if(checkbox.checked) labSelecionados.add(numero); else labSelecionados.delete(numero);
 }
-function loteBadgeLAB(l, mostrarTabela){
+function loteBadgeLAB(l, mostrarTabela, mostrarSelecao){
   const numero = escapeHtml(l.numeroLote);
   const marcado = labSelecionados.has(l.numeroLote);
   const copiado = !!l.copiadoLAB;
@@ -1456,29 +1465,33 @@ function loteBadgeLAB(l, mostrarTabela){
     const t = uniaoTally(l);
     tabelaHtml = `<table class="lab-mini-tabela"><thead><tr><th>TCA</th><th>MOFO</th><th>OUTROS</th></tr></thead><tbody><tr><td>${t.tca}</td><td>${t.mofo}</td><td>${t.outros}</td></tr></tbody></table>`;
   }
+  const checkboxHtml = mostrarSelecao
+    ? `<input type="checkbox" class="lab-lote-check" ${marcado?'checked':''} onclick="event.stopPropagation(); toggleSelecaoLAB('${numero}', this)" title="Selecionar para copiar só este lote">`
+    : '';
   return `<div class="lab-lote-wrap" data-lote="${numero}">
     ${ambosObs ? `<span class="lab-obs-flag" title="Observações preenchidas pelos 2 provadores">&#10038;</span>` : ''}
     <div class="lab-lote-row">
-      <input type="checkbox" class="lab-lote-check" ${marcado?'checked':''} onclick="event.stopPropagation(); toggleSelecaoLAB('${numero}', this)" title="Selecionar para copiar só este lote">
+      ${checkboxHtml}
       <button type="button" class="lab-lote-btn${copiado?' copiado':''}" onclick="openLoteDetail('${numero}')" title="${copiado?'Já copiado/enviado ao LAB':''}">${letraPrioHtml(l)}${numero}</button>
     </div>
     ${tabelaHtml}
   </div>`;
 }
-function renderColunaLAB(elId, contId, lotes, mostrarTabela){
+function renderColunaLAB(elId, contId, lotes, mostrarTabela, mostrarSelecao){
   const cont = document.getElementById(contId);
   if(cont) cont.textContent = lotes.length;
   const el = document.getElementById(elId);
   if(!el) return;
-  el.innerHTML = lotes.length ? lotes.map(l=> loteBadgeLAB(l, mostrarTabela)).join('') : `<div class="empty-note" style="font-size:11px;padding:4px 0;">Sem lotes.</div>`;
+  el.innerHTML = lotes.length ? lotes.map(l=> loteBadgeLAB(l, mostrarTabela, mostrarSelecao)).join('') : `<div class="empty-note" style="font-size:11px;padding:4px 0;">Sem lotes.</div>`;
 }
 function renderTabelaLAB(){
   const todos = todosLotes();
-  // a mini-tabela TCA/MOFO/OUTROS só aparece em Concluídos (a pedido) — Planeados/WIP mantêm-se só
-  // com a caixa de seleção + botão do lote (o "Copiar" continua a levar TCA/MOFO/OUTROS nas 3 colunas).
-  renderColunaLAB('labColPlaneados', 'labContPlaneados', todos.filter(l=> grupoLoteLAB(l)==='planeados'), false);
-  renderColunaLAB('labColWip', 'labContWip', todos.filter(l=> grupoLoteLAB(l)==='wip'), false);
-  renderColunaLAB('labColConcluidos', 'labContConcluidos', todos.filter(l=> grupoLoteLAB(l)==='concluidos'), true);
+  // 22/09/2026: a caixa de seleção + o botão "Copiar" ficaram só na coluna Concluídos (a pedido da
+  // Joana) — em Planeados/WIP não fazem sentido, porque esses lotes ainda não têm nada para "enviar
+  // ao LAB". A mini-tabela TCA/MOFO/OUTROS também continua só em Concluídos.
+  renderColunaLAB('labColPlaneados', 'labContPlaneados', todos.filter(l=> grupoLoteLAB(l)==='planeados'), false, false);
+  renderColunaLAB('labColWip', 'labContWip', todos.filter(l=> grupoLoteLAB(l)==='wip'), false, false);
+  renderColunaLAB('labColConcluidos', 'labContConcluidos', todos.filter(l=> grupoLoteLAB(l)==='concluidos'), true, true);
   if(historicoLABAberto) renderTabelaHistoricoLAB();
 }
 /* Selecionar/copiar os botões dos lotes à mão concatena tudo numa única célula do Excel (e ainda
