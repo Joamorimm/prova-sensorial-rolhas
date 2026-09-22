@@ -217,6 +217,9 @@ main{padding:14px 14px 10px;}
 .quad-estado-txt.e-wip{background:#EDB05E;color:var(--text);}
 /* lote importado hoje mas só pode ser cheirado amanhã (D+1) — visível já, mas assinalado como ainda não disponível */
 .quad-lote.futuro{opacity:.6;border-style:dashed;}
+/* 22/09/2026: aviso de "2 amostras distintas com o mesmo nº de lote" na importação — canto
+   superior central (os cantos laterais já são usados pela letra U/P e pelo distintivo Bartops) */
+.quad-aviso-dup{position:absolute;top:2px;left:50%;transform:translateX(-50%);font-size:13px;line-height:1;color:#c0392b;}
 
 .section-title{font-size:12.5px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);font-weight:700;margin:18px 2px 8px;display:flex;justify-content:space-between;align-items:center;}
 
@@ -564,6 +567,7 @@ function garantirCamposNovos(l){
   if(l.provador1 && !l.provaAbertaEm){
     l.provaAbertaEm = (l.registos.p1 && l.registos.p1.assinadoEm) || l.atualizadoEm || l.criadoEm || new Date().toISOString();
   }
+  if(l.avisoDuplicado===undefined) l.avisoDuplicado = false;
   // Migração (21/09/2026): lotes decididos ANTES de "aprovado"/"rejeitado" deixarem de existir ainda
   // têm essas palavras gravadas em decisao.final (vindas do servidor/localStorage antigo). Sem isto,
   // o resto da app (que só reconhece 'concluido') trata-os como "ainda não decidido" — é o que fazia
@@ -788,6 +792,10 @@ function criarLoteVazio(numero){
     decisao: { final:null, comentarios:'', decididoPor:'', data:'', supervisorResponsavel:'', motivoEscalamento:'' },
     levantamentoConcluido: false, levantamentoData: '',
     alertaP3Enviado: false, // controla o envio do email de alerta do 3º provador (nunca duplica)
+    // 22/09/2026: aviso quando este nº de lote apareceu em 2 (ou mais) amostras distintas na mesma
+    // importação do dia (ex: 2 linhas na folha "Amostragens" com o mesmo FILE, ambas marcadas
+    // Sensorial) — fica marcado para avisar a Produção/quem pegar no lote que pode haver engano.
+    avisoDuplicado: false,
     criadoEm: new Date().toISOString(),
     atualizadoEm: new Date().toISOString()
   };
@@ -1193,7 +1201,10 @@ function renderGradeLotes(){
     const bloqueado = loteBloqueadoAteAmanha(l);
     const dataDisp = bloqueado ? `${l.diaPrevisto.slice(8,10)}/${l.diaPrevisto.slice(5,7)}` : '';
     const tituloFuturo = bloqueado ? ` · Disponível para prova a partir de ${dataDisp}` : '';
-    return `<button class="quad-lote q-prio-${grupoPrio}${bloqueado?' futuro':''}" title="${escapeHtml(prioLabel(l.prioridade))}${l.bartops?' · Bartops':''} · ${escapeHtml(tituloEstado)}${tituloFuturo}" onclick="openLoteDetail('${escapeHtml(l.numeroLote)}')">${letraHtml}${bartopsHtml}${escapeHtml(l.numeroLote)}${estadoHtml}</button>`;
+    // 22/09/2026: aviso quando este lote apareceu em 2 amostras distintas na importação (ver avisoDuplicado)
+    const avisoDupHtml = l.avisoDuplicado ? `<span class="quad-aviso-dup" title="Este nº de lote apareceu em 2 amostras distintas na importação — confirma com a Produção">&#9888;</span>` : '';
+    const tituloDup = l.avisoDuplicado ? ` · ATENÇÃO: apareceu em 2 amostras distintas na importação` : '';
+    return `<button class="quad-lote q-prio-${grupoPrio}${bloqueado?' futuro':''}" title="${escapeHtml(prioLabel(l.prioridade))}${l.bartops?' · Bartops':''} · ${escapeHtml(tituloEstado)}${tituloFuturo}${tituloDup}" onclick="openLoteDetail('${escapeHtml(l.numeroLote)}')">${letraHtml}${bartopsHtml}${avisoDupHtml}${escapeHtml(l.numeroLote)}${estadoHtml}</button>`;
   }).join('');
 }
 
@@ -1243,7 +1254,10 @@ function extrairLotesDaFolha(rows, ignorarData){
     // importamos nada dele (nunca assumir "todas as linhas servem" só porque não achámos a coluna)
     return [];
   }
-  const encontrados = new Set();
+  // 22/09/2026: devolve as OCORRÊNCIAS (uma entrada por linha, sem retirar repetidos) — é o que
+  // permite ao chamador (importarOrdensExcel) detetar quando o mesmo nº de lote aparece em 2
+  // linhas/amostras distintas marcadas para Sensorial no mesmo dia (ver avisoDuplicado).
+  const encontrados = [];
   for(let r=1; r<rows.length; r++){
     const row = rows[r] || [];
     if(!(row[colSensorial]||'').toString().trim()) continue; // só linhas marcadas para análise Sensorial
@@ -1253,9 +1267,9 @@ function extrairLotesDaFolha(rows, ignorarData){
     }
     const val = (row[colLote]||'').toString().trim();
     const m = val.match(padrao);
-    if(m) encontrados.add(normLote(m[0]));
+    if(m) encontrados.push(normLote(m[0]));
   }
-  return [...encontrados];
+  return encontrados;
 }
 function lerFicheiroOrdens(file){
   return new Promise((resolve)=>{
@@ -1308,35 +1322,56 @@ function esconderLoading(){
   const el = document.getElementById('loadingOverlay');
   if(el) el.classList.add('hidden');
 }
+/* Aplica os resultados já lidos (um {ok, nome, lotes} por ficheiro — ver lerFicheiroOrdens) ao
+   state.lotes: cria os novos, marca previstoHoje/diaPrevisto, e deteta duplicados. Isolado do
+   resto de importarOrdensExcel para poder ser testado sem precisar de um ficheiro Excel real.
+   22/09/2026: além de juntar todos os lotes encontrados, deteta quando o MESMO nº de lote aparece
+   em 2 (ou mais) linhas/amostras distintas dentro do MESMO ficheiro (ex: 2 linhas na folha
+   "Amostragens", ambas marcadas Sensorial para hoje) — isso é sinal de possível engano, por isso
+   fica assinalado (avisoDuplicado) para a Produção/quem pegar no lote confirmar. Não conta como
+   duplicado um lote que apareça em ficheiros DIFERENTES (Amostragens + Ordem de Trabalhos) — isso
+   é normal, os 2 ficheiros descrevem a mesma amostragem de ângulos diferentes. */
+function aplicarImportacaoOrdens(resultados, numFicheiros){
+  const falhas = resultados.filter(r=> !r.ok);
+  const lotesEncontrados = new Set();
+  const duplicados = new Set();
+  resultados.filter(r=> r.ok).forEach(r=>{
+    const contagemNesteFicheiro = {};
+    r.lotes.forEach(n=>{
+      lotesEncontrados.add(n);
+      contagemNesteFicheiro[n] = (contagemNesteFicheiro[n]||0) + 1;
+    });
+    Object.keys(contagemNesteFicheiro).forEach(n=>{ if(contagemNesteFicheiro[n] >= 2) duplicados.add(n); });
+  });
+
+  if(!lotesEncontrados.size){
+    let msg = 'Não há amostras Sensoriais marcadas para hoje nos ficheiro(s) selecionados, ou não reconheci as colunas Data / FILE / Sensorial.';
+    if(falhas.length) msg += `\nNão consegui ler: ${falhas.map(f=> f.nome+' ('+f.erro+')').join(', ')}`;
+    return { msg, aplicou:false };
+  }
+  let novos = 0;
+  // aparecem já na grelha hoje (confirma que a importação resultou), mas só ficam disponíveis
+  // para serem cheirados a partir de amanhã (D+1) — ver loteBloqueadoAteAmanha()
+  lotesEncontrados.forEach(num=>{
+    if(!state.lotes[num]){ state.lotes[num] = criarLoteVazio(num); novos++; }
+    state.lotes[num].previstoHoje = true;
+    state.lotes[num].diaPrevisto = amanhaStr();
+    if(duplicados.has(num)) state.lotes[num].avisoDuplicado = true;
+  });
+  saveState();
+  let msg = `${lotesEncontrados.size} lote(s) de amostragem Sensorial importados (${novos} novo(s)) a partir de ${numFicheiros} ficheiro(s). Já aparecem na grelha — disponíveis para prova a partir de amanhã.`;
+  if(duplicados.size) msg += `\n\nATENÇÃO: ${duplicados.size} lote(s) apareceram em 2 amostras distintas no mesmo ficheiro — ficam assinalados na grelha e na ficha do lote: ${[...duplicados].join(', ')}`;
+  if(falhas.length) msg += `\nAtenção: não consegui ler ${falhas.map(f=> f.nome).join(', ')}.`;
+  return { msg, aplicou:true, duplicados:[...duplicados] };
+}
 function importarOrdensExcel(input){
   const files = Array.from(input.files||[]);
   if(!files.length) return;
   mostrarLoading(files.length>1 ? `A ler ${files.length} ficheiros…` : 'A ler o ficheiro…');
   Promise.all(files.map(lerFicheiroOrdens)).then(resultados=>{
-    const falhas = resultados.filter(r=> !r.ok);
-    const lotesEncontrados = new Set();
-    resultados.filter(r=> r.ok).forEach(r=> r.lotes.forEach(n=> lotesEncontrados.add(n)));
-
-    if(!lotesEncontrados.size){
-      let msg = 'Não há amostras Sensoriais marcadas para hoje nos ficheiro(s) selecionados, ou não reconheci as colunas Data / FILE / Sensorial.';
-      if(falhas.length) msg += `\nNão consegui ler: ${falhas.map(f=> f.nome+' ('+f.erro+')').join(', ')}`;
-      alert(msg);
-      input.value = '';
-      return;
-    }
-    let novos = 0;
-    // aparecem já na grelha hoje (confirma que a importação resultou), mas só ficam disponíveis
-    // para serem cheirados a partir de amanhã (D+1) — ver loteBloqueadoAteAmanha()
-    lotesEncontrados.forEach(num=>{
-      if(!state.lotes[num]){ state.lotes[num] = criarLoteVazio(num); novos++; }
-      state.lotes[num].previstoHoje = true;
-      state.lotes[num].diaPrevisto = amanhaStr();
-    });
-    saveState();
-    let msg = `${lotesEncontrados.size} lote(s) de amostragem Sensorial importados (${novos} novo(s)) a partir de ${files.length} ficheiro(s). Já aparecem na grelha — disponíveis para prova a partir de amanhã.`;
-    if(falhas.length) msg += `\nAtenção: não consegui ler ${falhas.map(f=> f.nome).join(', ')}.`;
-    alert(msg);
-    renderAll();
+    const r = aplicarImportacaoOrdens(resultados, files.length);
+    alert(r.msg);
+    if(r.aplicou) renderAll();
     input.value = '';
   }).catch(err=>{
     alert('Ocorreu um erro inesperado ao importar: ' + err.message);
@@ -2150,6 +2185,7 @@ function openLoteDetail(numero){
       <button class="modal-close" onclick="closeModal('overlayLote')">&times;</button>
       <h2>${escapeHtml(numero)} <span class="badge badge-${lote.prioridade}">${prioLabel(lote.prioridade)}</span></h2>
       <div class="sub">Estado atual: <strong>${STATUS_META[status]?STATUS_META[status].label:status}</strong></div>
+      ${lote.avisoDuplicado ? `<div class="empty-note" style="padding:8px 10px;margin-bottom:10px;border-radius:9px;background:#fbe4e1;color:#8a2e21;font-weight:700;">&#9888; Este nº de lote apareceu em 2 amostras distintas na importação de hoje — confirma com a Produção que não há engano.</div>` : ''}
       ${corpoExtra}
       <div class="actions-row">
         <button class="btn" onclick="closeModal('overlayLote')">Fechar</button>
