@@ -1627,10 +1627,13 @@ function exportarTabelaLABCsv(){
 
 /* ==================== LEVANTAMENTO (Logística — recolha de material após lotes com TCA/Mofo) ====================
    14/09/2026: simplificado a pedido da Joana — só o essencial e imediato para quem vai recolher o
-   material. 21/09/2026: já não há "rejeitado" — mostra-se aqui qualquer lote concluído com
-   temFrascosParaLevantar=true. "Por levantar (hoje)" mostra só os de HOJE (l.decisao.data), por isso
-   limpa-se sozinho todos os dias — passado esse dia, o lote sai daqui e passa a viver só no separador
-   "Histórico" (sem esse filtro de data), para quem precisar de consultar para trás. */
+   material.
+   23/09/2026 (regra final, confirmada com a Joana): os critérios de conclusão da prova e de chamar o
+   3º provador (3 TCA / 4 Mofo EM COMUM) servem só para a app decidir sozinha e para saber se precisa
+   de confronto — não filtram o que a Logística vê. Para a Logística, mostra-se sempre TODOS os
+   frascos identificados por QUALQUER provador (P1, P2 ou P3) em QUALQUER lote já concluído — mesmo
+   abaixo do limiar (ex.: só 1 Mofo Percetível). temFrascosParaLevantar deixou de filtrar aqui; um
+   lote concluído sem nenhum frasco assinalado simplesmente aparece com "0" (ver renderLevantamentoCard). */
 let filtroLevantamento = 'pendentes';
 function filtrarLevantamento(f){
   filtroLevantamento = f;
@@ -1676,7 +1679,10 @@ function renderListaLevantamento(){
     el.innerHTML = `<div class="empty-note">Usa "Ler código de barras da etiqueta" para veres os frascos a levantar de cada lote, um a um.</div>`;
     return;
   }
-  const lotes = todosLotes().filter(l=> l.decisao.final==='concluido' && l.decisao.temFrascosParaLevantar)
+  // 23/09/2026: mostra TODOS os lotes concluídos (não só os que passaram o limiar de 3 TCA/4 Mofo em
+  // comum) — o limiar só decide a prova sozinha, não filtra o que a Logística tem de conferir. Um
+  // lote concluído sem nada assinalado aparece igual, só que com "0" (ver renderLevantamentoCard).
+  const lotes = todosLotes().filter(l=> l.decisao.final==='concluido')
     .sort((a,b)=> (b.decisao.data||'').localeCompare(a.decisao.data||''));
   el.innerHTML = lotes.length ? lotes.map(renderLevantamentoCard).join('') : `<div class="empty-note">Ainda sem lotes no histórico.</div>`;
 }
@@ -1940,9 +1946,12 @@ function htmlResultadoLevantamento(num){
   if(!lote){
     return `<div class="empty-note" style="padding:10px 0;">Não encontrei nenhum lote com o nº <strong>${escapeHtml(num)}</strong>.</div>`;
   }
-  if(!(lote.decisao.final==='concluido' && lote.decisao.temFrascosParaLevantar)){
-    const motivo = lote.decisao.final==='concluido' ? '(prova concluída, sem frascos a levantar)' : '(ainda não foi decidido)';
-    return `<div class="empty-note" style="padding:10px 0;">O lote <strong>${escapeHtml(num)}</strong> não tem frascos para levantar ${motivo}.</div>`;
+  // 23/09/2026, a pedido da Joana: simplificado — lê o código de barras, confirma que o lote está
+  // concluído, e mostra logo os frascos a levantar (união do Provador 1+2, ou do 3º se existir),
+  // mesmo que sejam 0 (renderLevantamentoCard já mostra "0" nesse caso). Deixou de haver aqui uma
+  // mensagem à parte para "concluído mas sem frascos a levantar" — é só mais um caso do mesmo cartão.
+  if(lote.decisao.final!=='concluido'){
+    return `<div class="empty-note" style="padding:10px 0;">O lote <strong>${escapeHtml(num)}</strong> ainda não foi decidido.</div>`;
   }
   return renderLevantamentoCard(lote);
 }
