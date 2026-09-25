@@ -316,8 +316,10 @@ legend{font-size:11.5px;font-weight:800;color:var(--muted);padding:0 6px;text-tr
 .aroma-picker button.aroma-full{grid-column:1 / -1;}
 .aroma-limpo{display:block;width:100%;text-align:center;background:none;border:none;color:var(--muted);font-size:12.5px;font-weight:600;text-decoration:underline;padding:6px;}
 
-/* grelha de frascos (nº1 a nº50): toque direto e em qualquer ordem, sem navegação forçada */
-.frasco-grid{display:grid;grid-template-columns:repeat(8,1fr);gap:6px;margin:4px 0 14px;}
+/* grelha de frascos (nº1 a nº50): toque direto e em qualquer ordem, sem navegação forçada.
+   25/09/2026: passou a ser sempre 10 por fila (1-10, 11-20, 21-30...), a pedido da Joana, para
+   corresponder à disposição física real dos frascos no tabuleiro (fileiras de 10). */
+.frasco-grid{display:grid;grid-template-columns:repeat(10,1fr);gap:6px;margin:4px 0 14px;}
 /* navegação entre "ondas" de 50 frascos, para lotes com mais de 50 (100, 150, 200...) */
 .onda-nav{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:10px;}
 .onda-contador{font-size:13px;font-weight:700;color:var(--text);text-align:center;flex:1;}
@@ -422,20 +424,14 @@ textarea#taPrioridadesInputInicio{min-height:110px;font-family:ui-monospace,mono
 
   <main>
     <section id="view-inicio" class="view">
-      <div class="toolbar-mini no-print">
-        <button class="btn btn-sm btn-primary" onclick="abrirScannerCodigoBarras()">Ler Código de Barras</button>
-        <button class="btn btn-sm btn-primary" onclick="document.getElementById('fileOrdens').click()" title="Seleciona os 2 ficheiros ao mesmo tempo: Amostragens 2026 + Ordem de Trabalhos 2026">Importar Ordens (Excel)</button>
-        <button class="btn btn-sm" onclick="toggleImportBox('importBoxInicio')" title="Marca prioridade (Prioritário/Urgente) e Bartops em lotes que já existem, colando o texto do email">Colar lista recebida por email</button>
-        <button class="btn btn-sm hidden" id="btnGerarLoteTeste" style="border:1px dashed var(--muted);" onclick="gerarLoteTeste()" title="Fase de testes — cria um lote de teste vazio, disponível hoje, para correres a prova toda à mão. Tira este botão depois de validares tudo.">Gerar lote de teste (DEV)</button>
-        <button class="btn btn-sm hidden" id="btnAlertaP3" style="border-color:var(--prio-u);color:var(--prio-u);font-weight:700;" onclick="abrirAlertaProvador3()" title="Lote(s) com divergência entre provadores por resolver — precisam do 3º provador">⚠ Provador 3: <span id="contagemAlertaP3">0</span></button>
-      </div>
-      <input type="file" id="fileOrdens" accept=".xlsx,.xls,.xlsm,.csv" multiple class="hidden">
-      <div id="importBoxInicio" class="hidden" style="margin-bottom:14px;">
-        <div class="field">
-          <label>Cola aqui o texto do email (um lote por linha; escreve URGENTE na linha para prioridade máxima)</label>
-          <textarea id="taPrioridadesInputInicio" placeholder="LT02364212 URGENTE&#10;LT02364099 URGENTE&#10;LT02363656&#10;LT02364105"></textarea>
-        </div>
-        <button class="btn btn-primary btn-block" onclick="importarPrioridades('taPrioridadesInputInicio')">Importar / Atualizar Prioridades</button>
+      <!-- 25/09/2026: removidos "Importar Ordens (Excel)" e "Colar lista recebida por email" a pedido
+           da Joana — deixou de haver validação prévia do lote por Excel/lista. Agora o próprio "Ler
+           Código de Barras" cria o lote na hora (ver abrirLoteExistente), no momento em que o provador
+           está à mesa a começar a prova. Fica só este botão, centrado. -->
+      <div class="toolbar-mini no-print" style="justify-content:center;">
+        <button class="btn btn-sm btn-primary" style="flex:0 0 auto;" onclick="abrirScannerCodigoBarras()">Ler Código de Barras</button>
+        <button class="btn btn-sm hidden" id="btnGerarLoteTeste" style="border:1px dashed var(--muted);flex:0 0 auto;" onclick="gerarLoteTeste()" title="Fase de testes — cria um lote de teste vazio, disponível hoje, para correres a prova toda à mão. Tira este botão depois de validares tudo.">Gerar lote de teste (DEV)</button>
+        <button class="btn btn-sm hidden" id="btnAlertaP3" style="border-color:var(--prio-u);color:var(--prio-u);font-weight:700;flex:0 0 auto;" onclick="abrirAlertaProvador3()" title="Lote(s) com divergência entre provadores por resolver — precisam do 3º provador">⚠ Provador 3: <span id="contagemAlertaP3">0</span></button>
       </div>
       <div class="legend-cores">
         <span class="lg-item"><span class="lg-dot lg-normal"></span>Normal</span>
@@ -506,9 +502,6 @@ textarea#taPrioridadesInputInicio{min-height:110px;font-family:ui-monospace,mono
 </div>
 
 <div id="modalRoot"></div>
-<div id="loadingOverlay" class="loading-overlay hidden">
-  <div class="loading-box"><div class="loading-spinner"></div><div class="loading-txt" id="loadingTxt">A processar…</div></div>
-</div>
 <div id="fileHelpers" class="hidden">
   </div>
 
@@ -1208,230 +1201,14 @@ function renderGradeLotes(){
   }).join('');
 }
 
-/* ==================== IMPORTAR ORDENS DO DIA (Excel) ==================== */
-/* Usam-se 2 ficheiros, importados em conjunto (seleção múltipla no mesmo input):
-   - Amostragens 2026.xlsx    → coluna "Sensorial" (na prática a coluna M) com "X"
-   - Ordem de Trabalhos 2026.xlsm → coluna "Sensorial" (na prática a coluna J) com "X" = lotes a integrar na app
-   A deteção da coluna é feita pelo NOME do cabeçalho ("Sensorial"), não pela letra da coluna,
-   por isso funciona nos dois ficheiros mesmo a coluna estando em posições diferentes.
-   Regra de datas: importamos as linhas marcadas para o próprio dia (mesma data de hoje). */
-function normalizarCabecalho(s){ return (s||'').toString().trim().toLowerCase(); }
-function dataCelulaToStr(v){
-  if(v instanceof Date){
-    // o motor de leitura do Excel por vezes desloca a hora ~1h (fuso horário) e a data
-    // cai às 23h do dia UTC anterior (ex: dia 10 vira "09 23:00"); soma-se 12h antes de
-    // ler o dia para nunca cair no dia errado por causa desse desvio de fuso.
-    const ajustada = new Date(v.getTime() + 12*60*60*1000);
-    return `${ajustada.getUTCFullYear()}-${String(ajustada.getUTCMonth()+1).padStart(2,'0')}-${String(ajustada.getUTCDate()).padStart(2,'0')}`;
-  }
-  return (v||'').toString().trim();
-}
-function extrairLotesDaFolha(rows, ignorarData){
-  if(!rows || !rows.length) return [];
-  // Array.from (em vez de .map) porque o sheet_to_json devolve arrays "esparsos" quando há
-  // células vazias na linha (ex: colunas separadoras) — .map salta esses buracos e deixa
-  // 'undefined' no header, o que fazia rebentar o .includes() mais abaixo.
-  const header = Array.from(rows[0]||[], normalizarCabecalho);
-  const colData = header.findIndex(h=> h==='data');
-  const colLote = header.findIndex(h=> h==='file' || h==='lote' || h.includes('lote'));
-  // aceita "Sensorial" ou abreviaturas como "Sens" (ficheiros diferentes usam nomes diferentes)
-  const colSensorial = header.findIndex(h=> h.startsWith('sens'));
-  const padrao = /\b[A-Z]{0,4}\d{5,}\b/i;
-  const alvo = hojeStr(); // importamos as linhas marcadas para o próprio dia (mesmo dia de registo)
-
-  if(colLote===-1){
-    // não reconheço a estrutura de colunas -> varre tudo à procura de códigos parecidos com nº de lote
-    const encontrados = new Set();
-    rows.forEach(row=> Array.from(row||[]).forEach(cell=>{
-      const m = (cell||'').toString().match(padrao);
-      if(m) encontrados.add(normLote(m[0]));
-    }));
-    return [...encontrados];
-  }
-
-  if(colSensorial===-1){
-    // não conseguimos confirmar qual é a coluna Sensorial neste ficheiro — por segurança não
-    // importamos nada dele (nunca assumir "todas as linhas servem" só porque não achámos a coluna)
-    return [];
-  }
-  // 22/09/2026: devolve as OCORRÊNCIAS (uma entrada por linha, sem retirar repetidos) — é o que
-  // permite ao chamador (importarOrdensExcel) detetar quando o mesmo nº de lote aparece em 2
-  // linhas/amostras distintas marcadas para Sensorial no mesmo dia (ver avisoDuplicado).
-  const encontrados = [];
-  for(let r=1; r<rows.length; r++){
-    const row = rows[r] || [];
-    if(!(row[colSensorial]||'').toString().trim()) continue; // só linhas marcadas para análise Sensorial
-    if(!ignorarData && colData!==-1){
-      const dataStr = dataCelulaToStr(row[colData]);
-      if(!dataStr.startsWith(alvo)) continue; // só linhas marcadas para hoje
-    }
-    const val = (row[colLote]||'').toString().trim();
-    const m = val.match(padrao);
-    if(m) encontrados.push(normLote(m[0]));
-  }
-  return encontrados;
-}
-function lerFicheiroOrdens(file){
-  return new Promise((resolve)=>{
-    const nomeArq = file.name.toLowerCase();
-    const ehCsv = nomeArq.endsWith('.csv');
-    const reader = new FileReader();
-    reader.onload = (e)=>{
-      try{
-        let rows;
-        if(ehCsv){
-          const texto = e.target.result;
-          rows = texto.split(/\r?\n/).map(l=> l.split(/[,;\t]/));
-        } else {
-          const data = new Uint8Array(e.target.result);
-          const wb = XLSX.read(data, {type:'array', cellDates:true});
-          // alguns ficheiros (ex: Ordem de Trabalhos, que tem "Chart1" antes) não têm os dados
-          // na 1ª folha — por isso procuramos a folha "Amostragens" pelo nome, com o índice 0 como reserva
-          const nomeFolha = wb.SheetNames.find(n=> normalizarCabecalho(n)==='amostragens') || wb.SheetNames[0];
-          const sheet = wb.Sheets[nomeFolha];
-          // alguns ficheiros têm um "!ref" inflacionado (ex: mais de 1 milhão de linhas) por causa
-          // de formatação aplicada a colunas/linhas inteiras — isso tornava a leitura extremamente
-          // lenta (chegava a nunca terminar). Limitamos a uma janela generosa e bem acima do volume
-          // real de dados (linhas do ano inteiro), para nunca ficar preso a processar milhões de células vazias.
-          let range;
-          if(sheet['!ref']){
-            const full = XLSX.utils.decode_range(sheet['!ref']);
-            const LIMITE_LINHAS = 20000, LIMITE_COLUNAS = 60;
-            if(full.e.r > LIMITE_LINHAS || full.e.c > LIMITE_COLUNAS){
-              range = { s:{r:full.s.r, c:full.s.c}, e:{r:Math.min(full.e.r, LIMITE_LINHAS), c:Math.min(full.e.c, LIMITE_COLUNAS)} };
-            }
-          }
-          rows = XLSX.utils.sheet_to_json(sheet, {header:1, range});
-        }
-        resolve({ok:true, nome:file.name, lotes: extrairLotesDaFolha(rows, ehCsv)});
-      }catch(err){
-        resolve({ok:false, nome:file.name, erro: err.message});
-      }
-    };
-    reader.onerror = ()=> resolve({ok:false, nome:file.name, erro:'erro ao ler o ficheiro'});
-    if(ehCsv) reader.readAsText(file); else reader.readAsArrayBuffer(file);
-  });
-}
-function mostrarLoading(txt){
-  const el = document.getElementById('loadingOverlay');
-  const txtEl = document.getElementById('loadingTxt');
-  if(txtEl) txtEl.textContent = txt || 'A processar…';
-  if(el) el.classList.remove('hidden');
-}
-function esconderLoading(){
-  const el = document.getElementById('loadingOverlay');
-  if(el) el.classList.add('hidden');
-}
-/* Aplica os resultados já lidos (um {ok, nome, lotes} por ficheiro — ver lerFicheiroOrdens) ao
-   state.lotes: cria os novos, marca previstoHoje/diaPrevisto, e deteta duplicados. Isolado do
-   resto de importarOrdensExcel para poder ser testado sem precisar de um ficheiro Excel real.
-   22/09/2026: além de juntar todos os lotes encontrados, deteta quando o MESMO nº de lote aparece
-   em 2 (ou mais) linhas/amostras distintas dentro do MESMO ficheiro (ex: 2 linhas na folha
-   "Amostragens", ambas marcadas Sensorial para hoje) — isso é sinal de possível engano, por isso
-   fica assinalado (avisoDuplicado) para a Produção/quem pegar no lote confirmar. Não conta como
-   duplicado um lote que apareça em ficheiros DIFERENTES (Amostragens + Ordem de Trabalhos) — isso
-   é normal, os 2 ficheiros descrevem a mesma amostragem de ângulos diferentes. */
-function aplicarImportacaoOrdens(resultados, numFicheiros){
-  const falhas = resultados.filter(r=> !r.ok);
-  const lotesEncontrados = new Set();
-  const duplicados = new Set();
-  resultados.filter(r=> r.ok).forEach(r=>{
-    const contagemNesteFicheiro = {};
-    r.lotes.forEach(n=>{
-      lotesEncontrados.add(n);
-      contagemNesteFicheiro[n] = (contagemNesteFicheiro[n]||0) + 1;
-    });
-    Object.keys(contagemNesteFicheiro).forEach(n=>{ if(contagemNesteFicheiro[n] >= 2) duplicados.add(n); });
-  });
-
-  if(!lotesEncontrados.size){
-    let msg = 'Não há amostras Sensoriais marcadas para hoje nos ficheiro(s) selecionados, ou não reconheci as colunas Data / FILE / Sensorial.';
-    if(falhas.length) msg += `\nNão consegui ler: ${falhas.map(f=> f.nome+' ('+f.erro+')').join(', ')}`;
-    return { msg, aplicou:false };
-  }
-  let novos = 0;
-  // aparecem já na grelha hoje (confirma que a importação resultou), mas só ficam disponíveis
-  // para serem cheirados a partir de amanhã (D+1) — ver loteBloqueadoAteAmanha()
-  lotesEncontrados.forEach(num=>{
-    if(!state.lotes[num]){ state.lotes[num] = criarLoteVazio(num); novos++; }
-    state.lotes[num].previstoHoje = true;
-    state.lotes[num].diaPrevisto = amanhaStr();
-    if(duplicados.has(num)) state.lotes[num].avisoDuplicado = true;
-  });
-  saveState();
-  let msg = `${lotesEncontrados.size} lote(s) de amostragem Sensorial importados (${novos} novo(s)) a partir de ${numFicheiros} ficheiro(s). Já aparecem na grelha — disponíveis para prova a partir de amanhã.`;
-  if(duplicados.size) msg += `\n\nATENÇÃO: ${duplicados.size} lote(s) apareceram em 2 amostras distintas no mesmo ficheiro — ficam assinalados na grelha e na ficha do lote: ${[...duplicados].join(', ')}`;
-  if(falhas.length) msg += `\nAtenção: não consegui ler ${falhas.map(f=> f.nome).join(', ')}.`;
-  return { msg, aplicou:true, duplicados:[...duplicados] };
-}
-function importarOrdensExcel(input){
-  const files = Array.from(input.files||[]);
-  if(!files.length) return;
-  mostrarLoading(files.length>1 ? `A ler ${files.length} ficheiros…` : 'A ler o ficheiro…');
-  Promise.all(files.map(lerFicheiroOrdens)).then(resultados=>{
-    const r = aplicarImportacaoOrdens(resultados, files.length);
-    alert(r.msg);
-    if(r.aplicou) renderAll();
-    input.value = '';
-  }).catch(err=>{
-    alert('Ocorreu um erro inesperado ao importar: ' + err.message);
-    input.value = '';
-  }).finally(()=>{
-    esconderLoading();
-  });
-}
-document.getElementById('fileOrdens').addEventListener('change', function(){ importarOrdensExcel(this); });
-/* ==================== VIEW: PRIORIDADES ==================== */
-/* 21/09/2026: "Colar lista recebida por email" tinha passado a existir também no ecrã Logística, mas
-   voltou a viver só no ecrã Lotes (importBoxInicio/taPrioridadesInputInicio) — a pedido da Joana, para
-   não ficar duplicado. As funções continuam a aceitar o id da caixa/textarea por parâmetro (útil se um
-   dia voltar a haver mais que um sítio a chamá-las), com os ids do ecrã Lotes como valor por omissão. */
-function toggleImportBox(boxId){ document.getElementById(boxId||'importBoxInicio').classList.toggle('hidden'); }
-function importarPrioridades(textareaId){
-  // Regra (11/09/2026): não se criam lotes novos por aqui — só pelo "Importar Ordens (Excel)".
-  // Esta caixa só serve para marcar prioridade/Bartops em lotes que já existem.
-  textareaId = textareaId || 'taPrioridadesInputInicio';
-  const txt = document.getElementById(textareaId).value;
-  const linhas = txt.split('\n').map(l=>l.trim()).filter(Boolean);
-  let n=0;
-  let ultimoNum = null; // para o caso de a marca B/U vir numa linha à parte (tabelas coladas de email)
-  const naoEncontrados = []; // lotes da lista que ainda não existem (não vieram do Importar Ordens) — não são criados
-  linhas.forEach(linha=>{
-    const m = linha.match(/[A-Z]{1,4}\d{4,}/i);
-    if(m){
-      const num = normLote(m[0]);
-      // texto depois do nº de lote na mesma linha (ex: "\tB", "\tU", ou a palavra completa)
-      const resto = linha.slice(m.index + m[0].length);
-      const urgente = /\bU\b/i.test(resto) || /URGENTE/i.test(linha);
-      const bartops = /\bB\b/i.test(resto) || /BARTOPS/i.test(linha);
-      if(!state.lotes[num]){
-        naoEncontrados.push(num);
-        ultimoNum = null; // não aplicar as marcas B/U de linhas seguintes a um lote que não existe
-        return;
-      }
-      state.lotes[num].prioridade = urgente ? 'vermelho' : (state.lotes[num].prioridade==='vermelho' ? 'vermelho' : 'amarelo');
-      if(bartops) state.lotes[num].bartops = true;
-      state.lotes[num].atualizadoEm = new Date().toISOString();
-      ultimoNum = num;
-      n++;
-    } else if(ultimoNum && /^B(ARTOPS)?$/i.test(linha)){
-      // a célula "B" da tabela colada saiu em linha própria — aplica ao último lote lido
-      state.lotes[ultimoNum].bartops = true;
-      state.lotes[ultimoNum].atualizadoEm = new Date().toISOString();
-    } else if(ultimoNum && /^U(RGENTE)?$/i.test(linha)){
-      state.lotes[ultimoNum].prioridade = 'vermelho';
-      state.lotes[ultimoNum].atualizadoEm = new Date().toISOString();
-    }
-  });
-  saveState();
-  document.getElementById(textareaId).value='';
-  let msg = n + ' lote(s) atualizado(s) com prioridade.';
-  if(naoEncontrados.length){
-    msg += `\n\nATENÇÃO: ${naoEncontrados.length} lote(s) desta lista ainda não existem na app (não vieram do "Importar Ordens (Excel)") e por isso NÃO foram criados — confirma com a logística e importa o Excel primeiro:\n${naoEncontrados.join(', ')}`;
-  }
-  alert(msg);
-  renderAll();
-}
+/* 25/09/2026: removidos "Importar Ordens (Excel)" e "Colar lista recebida por email" (e as funções
+   que os suportavam: normalizarCabecalho, dataCelulaToStr, extrairLotesDaFolha, lerFicheiroOrdens,
+   mostrarLoading/esconderLoading, aplicarImportacaoOrdens, importarOrdensExcel, toggleImportBox,
+   importarPrioridades) — a pedido da Joana. Deixou de haver validação prévia do lote por Excel/lista;
+   o lote passa a nascer na hora, quando o provador lê o código de barras à mesa (ver abrirLoteExistente
+   mais abaixo). O aviso de "2 amostras distintas" (avisoDuplicado) fica sem forma de ser acionado —
+   era só para apanhar duplicados dentro do Excel importado — mas o campo e a apresentação (ícone na
+   grelha, aviso na ficha do lote) continuam no código, sem incómodo, caso volte a fazer sentido. */
 /* ==================== LAB (3 colunas: Planeados / WIP / Concluídos + Histórico à parte) ====================
    O LAB deixou de decidir (a decisão é automática) — passou a ver só o essencial: 3 colunas lado a
    lado com o nº de cada lote (e a letra U/P quando o lote já tinha sido identificado como Urgente
@@ -1984,7 +1761,7 @@ function identificarLote(){
     <div class="modal">
       <button class="modal-close" onclick="closeModal('overlayIdent')">&times;</button>
       <h2>Identificar Lote</h2>
-      <div class="sub">Introduz o nº de lote (o mesmo da lista de prioridades / ordem de trabalho). Se já existir, abre o registo atual.</div>
+      <div class="sub">Introduz o nº de lote. Se já existir, abre o registo atual; caso contrário, cria o lote na hora.</div>
       <div class="field"><label>Nº de Lote</label><input id="fIdentLote" placeholder="ex: LT02364212" style="text-transform:uppercase;"></div>
       <div class="actions-row">
         <button class="btn" onclick="closeModal('overlayIdent')">Cancelar</button>
@@ -2001,11 +1778,18 @@ function confirmarIdentificarLote(){
   abrirLoteExistente(num);
 }
 function abrirLoteExistente(num){
-  // os lotes só existem depois de importados do Excel (Sensorial) — scanner, pesquisa e "+" já
-  // não criam lotes novos às cegas, só abrem os que já lá estão.
+  // 25/09/2026: já não há validação prévia por Excel/lista — a pedido da Joana, o lote nasce na hora,
+  // assim que o provador o lê (código de barras, pesquisa ou "Identificar Lote"), mesmo à mesa a
+  // começar a prova. Fica logo disponível HOJE (não D+1 — esse atraso só fazia sentido quando o lote
+  // era importado com antecedência) e é gravado no servidor como qualquer outro lote (ver saveState
+  // dentro de criarLoteVazio + guardarLocal/enviarAoServidor). Depois segue exatamente o mesmo trâmite
+  // de sempre — só mudou este primeiro ponto de criação dos dados do lote.
   if(!state.lotes[num]){
-    alert(`Lote ${num} não encontrado. Os lotes só aparecem depois de importados do Excel (Importar Ordens) — verifica o número ou confirma com a Carmo se este lote já foi importado.`);
-    return;
+    state.lotes[num] = criarLoteVazio(num);
+    state.lotes[num].previstoHoje = true;
+    state.lotes[num].diaPrevisto = hojeStr();
+    saveState();
+    renderAll(); // a grelha "Lotes de hoje" já mostra o lote novo assim que se fechar a ficha
   }
   openLoteDetail(num);
 }
@@ -2453,6 +2237,10 @@ function openRegistoModal(numero, provador){
 
       <div id="frascosArea"></div>
 
+      <div class="actions-row" style="margin:-6px 0 14px;">
+        <button type="button" class="btn btn-sm" onclick="adicionarMaisFrascos()" title="Usa isto se detetares que a amostra afinal tem mais frascos do que os que aparecem aqui (ex: são 100 em vez de 50)">+ Adicionar 50 Frascos</button>
+      </div>
+
       <fieldset style="margin-top:14px;">
         <legend>Apreciação Geral</legend>
         <div class="radio-row">
@@ -2476,6 +2264,21 @@ function renderRegistoFrascos(){
   const total = lote.numeroFrascos || 50;
   el.innerHTML = htmlGrelha(total);
 }
+/* 25/09/2026: a pedido da Joana — amostras costumam ter 50 frascos, mas por vezes têm 100 (ou mais).
+   Em vez de obrigar a corrigir o nº de frascos antecipadamente (via Excel ou painel de administração),
+   o próprio provador pode acrescentar mais 50 assim que percebe que a amostra é maior do que o
+   esperado. Acrescenta ao LOTE (não só a este registo) — os outros provadores também passam a ver
+   os frascos extra. Salta logo para a onda nova, para o provador continuar a marcar sem ter de navegar. */
+function adicionarMaisFrascos(){
+  if(!confirm('Tem a certeza que quer adicionar mais 50 frascos à prova?')) return;
+  const lote = state.lotes[ctxLote];
+  lote.numeroFrascos = (lote.numeroFrascos||50) + 50;
+  lote.atualizadoEm = new Date().toISOString();
+  saveState();
+  ondaGridAtiva = Math.max(0, Math.ceil(lote.numeroFrascos/50) - 1);
+  frascoAtivoGrid = null;
+  renderRegistoFrascos();
+}
 function itemFrasco(n){
   const reg = state.lotes[ctxLote].registos[ctxProvador];
   return reg.itens.find(it=> it.frasco===n);
@@ -2497,8 +2300,10 @@ function htmlGrelha(total){
   if(ondaGridAtiva < 0) ondaGridAtiva = 0;
   const inicio = ondaGridAtiva*50 + 1;
   const fim = Math.min((ondaGridAtiva+1)*50, total);
-  // 1ª posição da grelha fica em branco na 1ª onda (o frasco 1 avança para a 2ª posição), tal como no esquema
-  let tiles = ondaGridAtiva===0 ? '<div class="frasco-tile frasco-vazio" aria-hidden="true"></div>' : '';
+  // 25/09/2026: já não há posição em branco no início — a pedido da Joana, a grelha passou a ser
+  // sempre 10 por fila (1-10, 11-20, 21-30...), para corresponder exatamente à disposição física dos
+  // frascos no tabuleiro; uma célula em branco no início desalinhava essa correspondência fila-a-fila.
+  let tiles = '';
   for(let n=inicio;n<=fim;n++){
     const it = itemFrasco(n);
     tiles += `<button type="button" class="frasco-tile ${it?'marcado':''}" onclick="abrirSeletorGrid(${n})">
