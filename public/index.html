@@ -1167,9 +1167,21 @@ function todosLotes(){ return Object.values(state.lotes).sort((a,b)=> prioRank(b
 /* ==================== VIEW: INÍCIO (grelha de quadrados, 1 por lote de hoje) ==================== */
 /* Assim que a prova de um lote fica concluída, ele sai logo da grelha de produção e passa a estar
    disponível apenas no separador Histórico — não espera pelo fim do dia. */
-function hojeStr(){ return new Date().toISOString().slice(0,10); }
-function ontemStr(){ const d = new Date(); d.setUTCDate(d.getUTCDate()-1); return d.toISOString().slice(0,10); }
-function amanhaStr(){ const d = new Date(); d.setUTCDate(d.getUTCDate()+1); return d.toISOString().slice(0,10); }
+/* 28/09/2026 — bug encontrado a pedido da Joana ("colega não conseguiu ler etiquetas antes das 7h"):
+   estas 3 funções usavam toISOString(), que devolve sempre a data em UTC, não a data local do
+   telemóvel/tablet. Portugal está geralmente 1h (verão) ou 0h (inverno) à frente de UTC — durante a
+   janela logo a seguir à meia-noite local em que o UTC ainda não rodou para o dia novo (e, mais grave,
+   em qualquer telemóvel cujo fuso horário esteja mal configurado), "hoje" podia ficar um dia atrasado
+   em relação ao calendário do aparelho. Isso fazia um lote lido/criado nessa janela ficar com
+   diaPrevisto no dia errado — podendo parecer "bloqueado até amanhã" (loteBloqueadoAteAmanha) sem ser.
+   Agora usam a data LOCAL do próprio aparelho (getFullYear/getMonth/getDate), nunca UTC — deixa de
+   haver qualquer desfasamento, seja qual for a hora ou o fuso horário do telemóvel. */
+function paraDataLocalStr(d){
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+function hojeStr(){ return paraDataLocalStr(new Date()); }
+function ontemStr(){ const d = new Date(); d.setDate(d.getDate()-1); return paraDataLocalStr(d); }
+function amanhaStr(){ const d = new Date(); d.setDate(d.getDate()+1); return paraDataLocalStr(d); }
 function loteBloqueadoAteAmanha(l){ return !!(l.diaPrevisto && l.diaPrevisto > hojeStr()); }
 function lotesDeHoje(){
   // só os lotes ainda por decidir (pendentes de qualquer dia + previstos para hoje ainda não iniciados)
@@ -1711,10 +1723,16 @@ function mostrarErroScanner(){
   if(overlay && !overlay.querySelector('.scanner-erro')) overlay.querySelector('.modal').insertAdjacentHTML('beforeend',
     `<div class="scanner-erro">Não foi possível aceder à câmara. Verifica as permissões do telemóvel/navegador, ou introduz o nº de lote manualmente.</div>`);
 }
+/* 28/09/2026, a pedido da Joana: a etiqueta da amostra tem vários códigos de barras (Lote Logístico,
+   Lote Controlo, PO, etc.) — a câmara lia qualquer um deles, e um código que não fosse mesmo o nº de
+   lote (ex.: o "Lote Controlo" 040000818265) acabava por criar um lote falso com esse texto. Agora só
+   se aceita um código cujo texto comece por "LT" (o nº do lote, ex.: LT02372690) — tudo o resto é
+   ignorado silenciosamente, como se não tivesse sido lido, e a câmara continua a tentar. */
+function pareceCodigoLote(num){ return /^LT/.test(num); }
 function onCodigoBarrasLido(decodedText){
   const num = normLote(decodedText);
   if(scannerModo === 'levantamento'){
-    if(!num) return; // ignora silenciosamente — a câmara continua a tentar ler, sem interromper nada
+    if(!num || !pareceCodigoLote(num)) return; // ignora silenciosamente — a câmara continua a tentar ler, sem interromper nada
     // enquanto a etiqueta continua à frente da câmara, o mesmo código é lido várias vezes por segundo —
     // ignora repetições do MESMO código durante 2.5s, para não estar sempre a redesenhar o cartão à toa.
     const agora = Date.now();
@@ -1724,8 +1742,8 @@ function onCodigoBarrasLido(decodedText){
     atualizarResultadoLevantamentoEmDireto(num);
     return;
   }
+  if(!num || !pareceCodigoLote(num)) return; // ignora silenciosamente outros códigos da etiqueta — mantém a câmara aberta
   fecharScanner();
-  if(!num){ alert('Código lido não parece um nº de lote válido: ' + decodedText); return; }
   abrirLoteExistente(num);
 }
 /* Texto/cartão a mostrar para um nº de lote no modo "levantamento": o cartão de Frascos a Levantar +
