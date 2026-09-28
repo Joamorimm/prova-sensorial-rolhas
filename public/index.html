@@ -1006,7 +1006,13 @@ function analiseCoincidenciaP1P2(lote){
       if(tipoDiscordante==='tcaForte' || tipoDiscordante==='mofoForte') temDiscordanteForte = true;
       return;
     }
-    // comum (os dois marcaram o mesmo frasco) — conta sempre, resolvendo o tipo por severidade
+    // comum (os dois marcaram o mesmo frasco) — 28/09/2026, confirmado com a Joana com um exemplo real
+    // (frasco com Mofo-P de um lado e Outro do outro): quando os dois marcam o MESMO frasco, conta
+    // sempre para uma das três categorias, resolvendo por HIERARQUIA quando divergem — TCA > Mofo >
+    // Outro (a intensidade Forte/Percetível nunca entra nesta hierarquia, só desempata dentro da
+    // mesma categoria). Ex.: Mofo-P vs Outro -> conta como Mofo (Mofo > Outro); TCA-F vs Mofo-P ->
+    // conta como TCA (TCA > Mofo). Só um frasco marcado por um único provador (discordante, ramo
+    // acima) é que nunca conta para nenhuma categoria.
     const tipo = combinarTipoDetalhado([tipoFrascoDetalhado(it1), tipoFrascoDetalhado(it2)].filter(Boolean));
     if(tipo==='tcaForte'||tipo==='tcaPercetivel') tca++;
     else if(tipo==='mofoForte'||tipo==='mofoPercetivel') mofo++;
@@ -1726,9 +1732,10 @@ function mostrarErroScanner(){
 /* 28/09/2026, a pedido da Joana: a etiqueta da amostra tem vários códigos de barras (Lote Logístico,
    Lote Controlo, PO, etc.) — a câmara lia qualquer um deles, e um código que não fosse mesmo o nº de
    lote (ex.: o "Lote Controlo" 040000818265) acabava por criar um lote falso com esse texto. Agora só
-   se aceita um código cujo texto comece por "LT" (o nº do lote, ex.: LT02372690) — tudo o resto é
-   ignorado silenciosamente, como se não tivesse sido lido, e a câmara continua a tentar. */
-function pareceCodigoLote(num){ return /^LT/.test(num); }
+   se aceita um código no formato exato do nº de lote — "LT" seguido de 8 dígitos (ex.: LT02372690) —
+   tudo o resto (incluindo um "LT" solto sem os 8 dígitos a seguir) é ignorado silenciosamente, como
+   se não tivesse sido lido, e a câmara continua a tentar. */
+function pareceCodigoLote(num){ return /^LT\d{8}$/.test(num); }
 function onCodigoBarrasLido(decodedText){
   const num = normLote(decodedText);
   if(scannerModo === 'levantamento'){
