@@ -438,6 +438,10 @@ textarea#taPrioridadesInputInicio{min-height:110px;font-family:ui-monospace,mono
       <!-- 25/09/2026: removida a legenda de cores/prioridade ("Normal"/"P Prioritário", antes também
            "U Urgente"/"B Bartops") a pedido da Joana — sem a importação de Excel/lista a definir
            prioridades, todos os lotes nascem "Normal", por isso a legenda deixou de fazer sentido aqui. -->
+      <!-- 29/09/2026, a pedido da Joana: o ecrã já não guarda lotes atrasados à espera que alguém os
+           limpe manualmente — ao passar a meia-noite, os lotes ainda por decidir de dias anteriores
+           são eliminados automaticamente (ver limparLotesAntigosSeNecessario()), para o ecrã "Lotes"
+           ficar sempre limpo sem depender da equipa. -->
       <div class="section-title">Lotes de hoje <span id="contagemHoje"></span></div>
       <div class="grade-lotes" id="gradeLotes"></div>
     </section>
@@ -543,6 +547,10 @@ function mostrarAvisoVersaoNova(){
 // 1ª verificação pouco depois de abrir (dá tempo à app de arrancar em paz), depois a cada 3 minutos.
 setTimeout(verificarNovaVersao, 20000);
 setInterval(verificarNovaVersao, 3*60*1000);
+
+// 29/09/2026, a pedido da Joana: garante que o ecrã "Lotes" fica limpo sozinho à meia-noite mesmo
+// que a app fique aberta num telemóvel/computador a noite toda sem ninguém dar refresh.
+setInterval(()=>{ limparLotesAntigosSeNecessario(); renderAll(); }, 5*60*1000);
 
 /* ==================== ESTADO / DADOS ==================== */
 const STORAGE_KEY = 'provaSensorialRolhas_v2';
@@ -1232,7 +1240,44 @@ function lotesDeHoje(){
   // só os lotes ainda por decidir (pendentes de qualquer dia + previstos para hoje ainda não iniciados)
   return todosLotes().filter(l=> !l.decisao.final);
 }
+/* 29/09/2026, a pedido da Joana: a limpeza do ecrã "Lotes" já não pode depender de alguém da
+   equipa se lembrar de apagar os atrasados. A partir de agora, assim que passa a meia-noite
+   (novo dia no calendário local do aparelho), qualquer lote ainda por decidir cujo dia previsto
+   seja anterior a hoje é eliminado automaticamente — independentemente de ter sido trabalhado ou
+   não, sem código de administração e sem confirmação de ninguém. O ecrã "Lotes" fica limpo
+   sozinho e só volta a ter lotes à medida que forem sendo lidos/criados de novo. Isto corre no
+   máximo uma vez por dia (controlado por state.ultimaLimpezaLotes) e é verificado tanto no
+   arranque da app como periodicamente, para apanhar o caso de a app ficar aberta a passar a
+   meia-noite sem ninguém fazer refresh. Um lote bloqueado até amanhã (diaPrevisto no futuro)
+   nunca é "atrasado" e nunca é tocado por esta limpeza. */
+function lotesAtrasados(){
+  return lotesDeHoje().filter(l=> l.diaPrevisto && l.diaPrevisto < hojeStr());
+}
+function limparLotesAntigosSeNecessario(){
+  const hoje = hojeStr();
+  if(state.ultimaLimpezaLotes === hoje) return;
+  const atrasados = lotesAtrasados();
+  atrasados.forEach(l=>{
+    delete state.lotes[l.numeroLote];
+    state.removidos[l.numeroLote] = new Date().toISOString();
+    fetch('/api/lotes/'+encodeURIComponent(l.numeroLote), {method:'DELETE'}).catch(()=>{});
+  });
+  state.ultimaLimpezaLotes = hoje;
+  guardarLocal();
+  if(atrasados.length) mostrarAvisoLimpezaAutomatica(atrasados.length);
+}
+function mostrarAvisoLimpezaAutomatica(n){
+  const antigo = document.getElementById('avisoLimpezaAutomatica');
+  if(antigo) antigo.remove();
+  const el = document.createElement('div');
+  el.id = 'avisoLimpezaAutomatica';
+  el.style.cssText = 'position:fixed;left:0;right:0;bottom:0;z-index:9999;background:#2f2440;color:#fff;padding:12px 16px;text-align:center;font-size:14px;font-weight:600;box-shadow:0 -2px 10px rgba(0,0,0,.25);';
+  el.textContent = `Novo dia — ${n} lote${n===1?'':'s'} de dia(s) anterior(es) ainda por decidir ${n===1?'foi':'foram'} limpo${n===1?'':'s'} automaticamente do ecrã "Lotes".`;
+  document.body.appendChild(el);
+  setTimeout(()=>{ el.remove(); }, 8000);
+}
 function renderGradeLotes(){
+  limparLotesAntigosSeNecessario();
   const lotes = lotesDeHoje();
   const contagemEl = document.getElementById('contagemHoje');
   if(contagemEl) contagemEl.textContent = lotes.length ? `(${lotes.length})` : '';
