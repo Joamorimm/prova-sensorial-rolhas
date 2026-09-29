@@ -1152,7 +1152,7 @@ function finalizarAutomatico(numero, temFrascosParaLevantar, classificacao, moti
   lote.decisao.decididoPor = lote.registos.p3.concluido ? (lote.provador3 || 'Provador 3') : 'Automático (regra da app)';
   lote.decisao.comentarios = motivo;
   lote.decisao.classificacao = classificacao || null;
-  lote.decisao.data = new Date().toISOString().slice(0,10);
+  lote.decisao.data = hojeStr(); // 29/09/2026: usar a data LOCAL (não toISOString(), que é UTC — mesmo bug já corrigido no hojeStr/ontemStr/amanhaStr), para bater certo com o dia em que "Concluídos" agrupa o lote
   lote.atualizadoEm = new Date().toISOString();
 }
 /* Tenta fechar o lote sozinho, sem precisar de ninguém carregar em nenhum botão de decisão. Devolve
@@ -1338,18 +1338,21 @@ function renderGradeLotes(){
    lado com o nº de cada lote (e a letra U/P quando o lote já tinha sido identificado como Urgente
    ou Prioritário na importação). Sem colunas de Data/Prioridade por extenso/Provadores à vista —
    essa informação vive dentro da ficha do lote, que se abre ao tocar no número. Concluídos mostra
-   os lotes cujo DIA DE TRABALHO (diaPrevisto, o dia em que ficam disponíveis para os provadores) é
-   hoje; assim que esse dia passa, o lote sai daqui e passa a viver no Histórico (arquivo à parte, com
-   mais detalhe e exportação CSV, para quem precisar de consultar o histórico completo).
-   22/09/2026: passou a usar-se diaPrevisto em vez da data em que a decisão foi de facto registada no
-   sistema (decisao.data) — um lote que ficou parado dias à espera do 3º provador e só foi concluído
-   mais tarde não deve continuar a aparecer como "concluído hoje" só por ter sido fechado hoje; o que
-   importa é o dia para que foi preparado. Isto só se aplica a lotes já decididos (decisao.final
-   preenchido) — um lote ainda à espera do 3º provador (sem decisão) continua sempre em WIP, nunca é
-   "empurrado" para Concluídos/Histórico só por o diaPrevisto ter passado. */
+   os lotes FECHADOS HOJE (decisao.data igual a hoje); assim que o dia passa, o lote sai daqui e passa
+   a viver no Histórico (arquivo à parte, com mais detalhe e exportação CSV, para quem precisar de
+   consultar o histórico completo).
+   29/09/2026, a pedido da Joana: volta a usar-se decisao.data (dia em que a decisão foi de facto
+   registada no sistema) em vez de diaPrevisto (dia para que o lote estava previsto). Entre 22/09 e
+   29/09 tinha sido o contrário — um lote que ficasse parado dias à espera do 3º provador ia direto
+   para Histórico ao ser fechado, para não "sujar" a lista de hoje com fechos de trabalho antigo — mas
+   a Joana confirmou que isso estava a esconder no Histórico lotes fechados mesmo hoje (ex.: LT02380788,
+   fechado hoje mas com diaPrevisto de um dia anterior), quando deviam continuar visíveis no dropdown
+   "Concluídos" enquanto for hoje. Isto só se aplica a lotes já decididos (decisao.final preenchido) —
+   um lote ainda à espera do 3º provador (sem decisão) continua sempre em WIP, nunca é "empurrado" para
+   Concluídos/Histórico só por o diaPrevisto ou a data terem passado. */
 function prioLetraLAB(p){ return p==='vermelho'?'U':(p==='amarelo'?'P':'Normal'); }
 function grupoLoteLAB(l){
-  if(l.decisao.final) return l.diaPrevisto===hojeStr() ? 'concluidos' : 'historico';
+  if(l.decisao.final) return l.decisao.data===hojeStr() ? 'concluidos' : 'historico';
   if(!l.provador1) return 'planeados';
   return 'wip';
 }
