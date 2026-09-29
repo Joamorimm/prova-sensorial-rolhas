@@ -348,13 +348,21 @@ legend{font-size:11.5px;font-weight:800;color:var(--muted);padding:0 6px;text-tr
 /* LAB: 3 colunas lado a lado (Planeados/WIP/Concluídos), visíveis de imediato, sem separadores —
    só o nº do lote (+ letra U/P quando aplicável); clicar abre a ficha do lote com o resto da informação. */
 .lab-colunas{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:6px 0 14px;}
-.lab-col{background:#f3ecdb;border:1px solid var(--border);border-radius:10px;padding:8px 6px;min-height:56px;}
-.lab-col-titulo{font-size:10.5px;font-weight:800;text-transform:uppercase;color:var(--muted);text-align:center;margin-bottom:8px;position:relative;}
+/* 29/09/2026, a pedido da Joana: quando uma coluna (normalmente "Concluídos") tem mais lotes do que
+   cabem no ecrã, a coluna já não estica a página toda para baixo — fica com altura limitada e ganha
+   scroll próprio (barra de scroll do rato/dedo), como um dropdown. Os lotes de hoje continuam TODOS
+   na mesma lista corrida de "Concluídos" — nunca são empurrados para o Histórico só por a lista
+   ser comprida; o Histórico continua a ser só para lotes de dias anteriores (ver lotesDeHoje()). */
+.lab-col{background:#f3ecdb;border:1px solid var(--border);border-radius:10px;padding:8px 6px;min-height:56px;display:flex;flex-direction:column;max-height:min(560px,70vh);}
+.lab-col-titulo{font-size:10.5px;font-weight:800;text-transform:uppercase;color:var(--muted);text-align:center;margin-bottom:8px;position:relative;flex:0 0 auto;}
 .lab-col-titulo .n{color:var(--accent-dark);font-size:11px;}
 /* copia os nºs de lote desta coluna, um por linha, para o Excel colar direto numa coluna (em vez de
    selecionar/copiar os botões à mão, que concatena tudo numa única célula) */
 .lab-col-copy{display:block;margin:4px auto 0;border:none;background:none;color:var(--accent-dark);font-size:9.5px;font-weight:700;text-decoration:underline;text-transform:none;padding:2px 4px;}
-.lab-col-lista{display:flex;flex-direction:column;gap:6px;}
+.lab-col-lista{display:flex;flex-direction:column;gap:6px;overflow-y:auto;overflow-x:hidden;flex:1 1 auto;padding-right:2px;scrollbar-width:thin;}
+.lab-col-lista::-webkit-scrollbar{width:7px;}
+.lab-col-lista::-webkit-scrollbar-thumb{background:var(--border);border-radius:4px;}
+.lab-col-lista::-webkit-scrollbar-thumb:hover{background:var(--muted);}
 .lab-lote-btn{flex:1;display:flex;align-items:center;justify-content:center;gap:4px;background:var(--panel);border:1.5px solid var(--border);border-radius:8px;padding:7px 4px;font-size:11px;font-weight:800;color:var(--text);word-break:break-all;text-align:center;}
 .lab-lote-btn:active{transform:scale(.96);}
 .lab-lote-btn.copiado{background:var(--purple-bg);border-color:var(--purple);color:var(--purple);}
