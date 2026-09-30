@@ -33,6 +33,219 @@ if (SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS) {
 // dentro da mesma execução do servidor — reinicia-se quando o Railway reinicia o serviço)
 const p3JaNotificados = new Set();
 
+// ---------- Cópia de segurança diária: SharePoint da empresa (preferido) ou email (30/09/2026, a
+// pedido da Joana) ----------
+// Todos os dias, a uma hora configurável, o servidor gera um CSV + um JSON com os lotes do dia
+// (ainda por decidir + fechados hoje) e grava-os diretamente numa pasta de um site do SharePoint da
+// empresa, via Microsoft Graph. Fica fora do Railway por completo — mesmo que a base de dados, o
+// serviço ou todos os telemóveis falhem ao mesmo tempo, o dia continua recuperável a partir dessa
+// pasta. Se o SharePoint ainda não estiver configurado (ou a gravação falhar), tenta enviar por
+// email como alternativa (usando o mesmo SMTP dos alertas do 3º provador).
+//
+// IMPORTANTE (decisão de propósito, 30/09/2026): isto está ligado a um SITE DO SHAREPOINT DA
+// EMPRESA — não à conta pessoal/OneDrive de ninguém. A Joana vai sair da empresa e não faz sentido
+// nenhum backup automático depender da conta dela (ou da de qualquer outra pessoa em concreto):
+// quando essa pessoa saísse, a conta seria desativada e o backup parava de funcionar sem ninguém dar
+// por isso. Ligado ao SharePoint da empresa, continua a funcionar sempre, independentemente de quem
+// lá trabalha — é a app (registada no Azure da empresa) a aceder a um recurso da empresa, não uma
+// pessoa a aceder à sua própria conta.
+//
+// Passos (só alguém com acesso de administrador do Microsoft 365 da empresa consegue fazer isto —
+// é comum ser alguém do departamento de TI):
+//   1. https://portal.azure.com -> Microsoft Entra ID -> App registrations -> New registration
+//      (nome, ex.: "Prova Sensorial - Backup"; Accounts in this organizational directory only).
+//   2. Nessa app: API permissions -> Add a permission -> Microsoft Graph -> Application permissions
+//      -> procurar e marcar "Sites.ReadWrite.All" -> Add permissions -> "Grant admin consent" (só um
+//      admin consegue clicar neste botão). (Sites.ReadWrite.All é o equivalente do Files.ReadWrite.All
+//      mas para SharePoint, em vez de para OneDrives pessoais.)
+//   3. Certificates & secrets -> New client secret -> copiar o VALOR imediatamente (só aparece uma vez).
+//   4. Na página "Overview" dessa app: copiar o "Application (client) ID" e o "Directory (tenant) ID".
+//   5. Escolher (ou criar) o site do SharePoint onde os backups vão ficar (ex.: um site de equipa
+//      "Qualidade" ou "Prova Sensorial") e anotar o endereço, ex.:
+//      https://corksupply.sharepoint.com/sites/QualidadeRolhas
+//      -> hostname: corksupply.sharepoint.com · caminho do site: /sites/QualidadeRolhas
+//   6. No Railway (Settings -> Variables), define:
+//        SHAREPOINT_TENANT_ID       — o Directory (tenant) ID
+//        SHAREPOINT_CLIENT_ID       — o Application (client) ID
+//        SHAREPOINT_CLIENT_SECRET   — o valor do client secret criado no passo 3
+//        SHAREPOINT_SITE_HOSTNAME   — ex.: corksupply.sharepoint.com
+//        SHAREPOINT_SITE_PATH       — ex.: /sites/QualidadeRolhas
+//        SHAREPOINT_FOLDER_PATH     — pasta dentro da biblioteca de documentos desse site (por
+//                                     omissão "ProvaSensorial/Backups"; criada sozinha se não existir)
+// Sem estas variáveis, a app continua a funcionar normalmente e tenta só o email (BACKUP_EMAIL_TO).
+//   BACKUP_EMAIL_TO  — destinatário do backup por email, se o SharePoint não estiver configurado (ou
+//                      falhar) — por omissão, usa ALERT_EMAIL_TO
+//   BACKUP_HORA      — hora do dia (Europa/Lisboa, formato "HH:mm") a partir da qual é gerado o
+//                      backup, assim que o servidor verificar depois dessa hora (por omissão "23:50")
+const SHAREPOINT_TENANT_ID = process.env.SHAREPOINT_TENANT_ID || '';
+const SHAREPOINT_CLIENT_ID = process.env.SHAREPOINT_CLIENT_ID || '';
+const SHAREPOINT_CLIENT_SECRET = process.env.SHAREPOINT_CLIENT_SECRET || '';
+const SHAREPOINT_SITE_HOSTNAME = process.env.SHAREPOINT_SITE_HOSTNAME || '';
+const SHAREPOINT_SITE_PATH = process.env.SHAREPOINT_SITE_PATH || '';
+const SHAREPOINT_FOLDER_PATH = (process.env.SHAREPOINT_FOLDER_PATH || 'ProvaSensorial/Backups').replace(/^\/+|\/+$/g, '');
+const SHAREPOINT_CONFIGURADO = !!(SHAREPOINT_TENANT_ID && SHAREPOINT_CLIENT_ID && SHAREPOINT_CLIENT_SECRET && SHAREPOINT_SITE_HOSTNAME && SHAREPOINT_SITE_PATH);
+const BACKUP_EMAIL_TO = process.env.BACKUP_EMAIL_TO || ALERT_EMAIL_TO;
+const BACKUP_HORA = process.env.BACKUP_HORA || '23:50';
+
+// Autenticação "app-only" (client credentials) — a app entra em nome dela própria, nunca em nome de
+// uma pessoa, por isso o "Grant admin consent" do passo 2 acima é obrigatório e não expira quando
+// alguém sai da empresa.
+async function obterTokenSharePoint() {
+  const url = `https://login.microsoftonline.com/${SHAREPOINT_TENANT_ID}/oauth2/v2.0/token`;
+  const body = new URLSearchParams({
+    client_id: SHAREPOINT_CLIENT_ID,
+    client_secret: SHAREPOINT_CLIENT_SECRET,
+    scope: 'https://graph.microsoft.com/.default',
+    grant_type: 'client_credentials',
+  });
+  const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body });
+  if (!res.ok) throw new Error(`token Microsoft Graph: ${res.status} ${await res.text()}`);
+  const data = await res.json();
+  return data.access_token;
+}
+// Resolve o ID interno do site do SharePoint a partir do hostname + caminho (só muda se o site for
+// recriado, por isso é seguro guardar em memória entre chamadas, para não pedir isto sempre).
+let sharepointSiteIdCache = null;
+async function obterSiteIdSharePoint(token) {
+  if (sharepointSiteIdCache) return sharepointSiteIdCache;
+  const url = `https://graph.microsoft.com/v1.0/sites/${SHAREPOINT_SITE_HOSTNAME}:${SHAREPOINT_SITE_PATH}`;
+  const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+  if (!res.ok) throw new Error(`resolver site do SharePoint: ${res.status} ${await res.text()}`);
+  const data = await res.json();
+  sharepointSiteIdCache = data.id;
+  return sharepointSiteIdCache;
+}
+// Grava um ficheiro na pasta configurada da biblioteca de documentos desse site (cria a pasta
+// sozinho, o endpoint "root:/caminho/ficheiro:/content" trata disso). Ficheiros pequenos (<4MB, como
+// estes) sobem numa única chamada PUT — não precisa de upload em pedaços.
+async function gravarFicheiroSharePoint(token, siteId, nomeFicheiro, conteudo, tipo) {
+  const caminho = `${SHAREPOINT_FOLDER_PATH}/${nomeFicheiro}`;
+  const url = `https://graph.microsoft.com/v1.0/sites/${siteId}/drive/root:/${caminho.split('/').map(encodeURIComponent).join('/')}:/content`;
+  const res = await fetch(url, {
+    method: 'PUT',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': tipo },
+    body: conteudo,
+  });
+  if (!res.ok) throw new Error(`gravar "${nomeFicheiro}" no SharePoint: ${res.status} ${await res.text()}`);
+}
+async function enviarBackupParaSharePoint(dia, csv, jsonCompleto) {
+  if (!SHAREPOINT_CONFIGURADO) return { enviado: false, motivo: 'SharePoint não configurado (ver comentário no topo do ficheiro para as variáveis necessárias)' };
+  try {
+    const token = await obterTokenSharePoint();
+    const siteId = await obterSiteIdSharePoint(token);
+    await gravarFicheiroSharePoint(token, siteId, `prova-sensorial-backup-${dia}.csv`, csv, 'text/csv');
+    await gravarFicheiroSharePoint(token, siteId, `prova-sensorial-backup-${dia}.json`, jsonCompleto, 'application/json');
+    return { enviado: true };
+  } catch (e) {
+    console.error('Erro a gravar o backup diário no SharePoint:', e.message);
+    return { enviado: false, motivo: 'falha no SharePoint: ' + e.message };
+  }
+}
+
+function hojeStrLisboa(d) {
+  // formata em Europa/Lisboa (não no fuso do servidor, normalmente UTC no Railway), para bater
+  // certo com o "hoje" que os provadores veem na app; en-CA dá diretamente o formato AAAA-MM-DD.
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Lisbon', year: 'numeric', month: '2-digit', day: '2-digit' }).format(d || new Date());
+}
+function horaAtualLisboa(d) {
+  return new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/Lisbon', hour: '2-digit', minute: '2-digit', hour12: false }).format(d || new Date());
+}
+function csvEscape(v) {
+  if (v === null || v === undefined) return '';
+  const s = String(v);
+  return /[",\n;]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+}
+// Os lotes que interessa proteger no backup de um dia: os ainda por decidir (de qualquer dia —
+// espelha lotesDeHoje() no cliente) e os já fechados NESSE dia (decisao.data) — os restantes já
+// ficaram fechados antes e já saíram num backup de um dia anterior.
+function lotesDoDiaParaBackup(lotesObj, dia) {
+  const out = {};
+  Object.keys(lotesObj || {}).forEach((numero) => {
+    const l = lotesObj[numero];
+    const d = l && l.decisao;
+    if (!d || !d.final || d.data === dia) out[numero] = l;
+  });
+  return out;
+}
+function construirCsvBackupDiario(lotesObj) {
+  const cols = ['numero', 'prioridade', 'diaPrevisto', 'provador1', 'provador2', 'provador3',
+    'decisaoFinal', 'decisaoData', 'temFrascosParaLevantar', 'comentariosDecisao',
+    'observacoesP1', 'observacoesP2', 'observacoesP3'];
+  const linhas = [cols.join(',')];
+  Object.keys(lotesObj || {}).sort().forEach((numero) => {
+    const l = lotesObj[numero] || {};
+    const d = l.decisao || {};
+    const r1 = (l.registos && l.registos.p1) || {};
+    const r2 = (l.registos && l.registos.p2) || {};
+    const r3 = (l.registos && l.registos.p3) || {};
+    linhas.push([
+      numero, l.prioridade || '', l.diaPrevisto || '', l.provador1 || '', l.provador2 || '', l.provador3 || '',
+      d.final || '', d.data || '', d.temFrascosParaLevantar ? 'sim' : 'não', d.comentarios || '',
+      r1.observacoes || '', r2.observacoes || '', r3.observacoes || '',
+    ].map(csvEscape).join(','));
+  });
+  return linhas.join('\n');
+}
+async function enviarBackupPorEmail(dia, csv, jsonCompleto, motivo) {
+  if (!mailer) return { enviado: false, motivo: 'SMTP não configurado (SMTP_HOST/SMTP_USER/SMTP_PASS)' };
+  if (!BACKUP_EMAIL_TO) return { enviado: false, motivo: 'sem destinatário (BACKUP_EMAIL_TO/ALERT_EMAIL_TO)' };
+  try {
+    await mailer.sendMail({
+      from: process.env.ALERT_EMAIL_FROM || process.env.SMTP_USER,
+      to: BACKUP_EMAIL_TO,
+      subject: `Prova Sensorial — cópia de segurança do dia ${dia} (${motivo || 'agendado'})`,
+      text: `Em anexo, a cópia de segurança dos lotes de ${dia} (ainda por decidir + fechados hoje).\n\nEsta cópia é gerada automaticamente para recuperação em caso de falha. Chegou por email porque o SharePoint não está configurado (ou falhou nesta tentativa) — ver SHAREPOINT_* no topo do server.js.`,
+      attachments: [
+        { filename: `prova-sensorial-backup-${dia}.csv`, content: csv },
+        { filename: `prova-sensorial-backup-${dia}.json`, content: jsonCompleto },
+      ],
+    });
+    return { enviado: true };
+  } catch (e) {
+    console.error('Erro a enviar o backup diário por email:', e.message);
+    return { enviado: false, motivo: 'falha no envio: ' + e.message };
+  }
+}
+// Gera o backup do dia e tenta gravá-lo primeiro no SharePoint; só se isso não estiver configurado
+// ou falhar é que tenta o email como alternativa — para nunca ficar sem nenhuma cópia de segurança.
+// Nunca lança erro para fora — devolve sempre {enviado, via, motivo/total}, para quem chamar decidir.
+async function enviarBackupDiario(motivo) {
+  const dia = hojeStrLisboa();
+  const lotesDia = lotesDoDiaParaBackup(store.lotes, dia);
+  const total = Object.keys(lotesDia).length;
+  const csv = construirCsvBackupDiario(lotesDia);
+  const jsonCompleto = JSON.stringify({ dia, lotes: lotesDia }, null, 2);
+
+  const viaSharePoint = await enviarBackupParaSharePoint(dia, csv, jsonCompleto);
+  if (viaSharePoint.enviado) return { enviado: true, via: 'sharepoint', dia, total };
+
+  const viaEmail = await enviarBackupPorEmail(dia, csv, jsonCompleto, motivo);
+  if (viaEmail.enviado) return { enviado: true, via: 'email', dia, total, avisoSharePoint: viaSharePoint.motivo };
+
+  return { enviado: false, dia, total, motivoSharePoint: viaSharePoint.motivo, motivoEmail: viaEmail.motivo };
+}
+// Verifica, de tempos a tempos, se já passou da hora combinada (BACKUP_HORA) e ainda não foi feito
+// o backup de hoje — corre uma vez a seguir ao arranque e depois a cada 10 minutos. O registo de
+// "já feito hoje" fica persistido (store.backupDiario), tal como os lotes, para não repetir o mesmo
+// dia outra vez caso o serviço reinicie depois da hora combinada.
+async function verificarBackupDiarioAgendado() {
+  if (!SHAREPOINT_CONFIGURADO && !(mailer && BACKUP_EMAIL_TO)) return; // nada configurado, nem vale a pena tentar
+  const dia = hojeStrLisboa();
+  if (store.backupDiario && store.backupDiario.data === dia) return; // já feito hoje
+  if (horaAtualLisboa() < BACKUP_HORA) return; // ainda não chegou a hora
+  const resultado = await enviarBackupDiario('agendado');
+  if (resultado.enviado) {
+    store.backupDiario = { data: dia, enviadoEm: new Date().toISOString(), via: resultado.via };
+    try {
+      await guardarUltimoBackupDiario(store.backupDiario);
+    } catch (e) {
+      console.error('Erro a guardar o registo do backup diário:', e.message);
+    }
+  } else {
+    console.warn('Backup diário agendado não foi feito — SharePoint:', resultado.motivoSharePoint, '| Email:', resultado.motivoEmail);
+  }
+}
+
 // ---------- Persistência: Postgres (preferido) ou ficheiro (fallback) ----------
 // Se a variável de ambiente DATABASE_URL estiver definida (ex: ligando um serviço
 // Postgres no Railway com ${{Postgres.DATABASE_URL}}), os lotes são guardados na
@@ -111,24 +324,31 @@ async function loadStore() {
       } catch (e) {
         console.error('Erro a ler configuração da base de dados, a começar vazio:', e.message);
       }
-      return { lotes, removidos, config };
+      let backupDiario = null;
+      try {
+        const { rows: rowsBackup } = await pool.query("SELECT valor FROM app_config WHERE chave = 'backupDiario'");
+        if (rowsBackup.length) backupDiario = rowsBackup[0].valor;
+      } catch (e) {
+        console.error('Erro a ler o registo do backup diário da base de dados:', e.message);
+      }
+      return { lotes, removidos, config, backupDiario };
     } catch (e) {
       console.error('Erro a ler da base de dados, a começar vazio:', e.message);
-      return { lotes: {}, removidos: {}, config: null };
+      return { lotes: {}, removidos: {}, config: null, backupDiario: null };
     }
   }
   try {
     if (fs.existsSync(DATA_FILE)) {
       const parsed = JSON.parse(fs.readFileSync(DATA_FILE, 'utf8'));
-      if (parsed && parsed.lotes) return { lotes: parsed.lotes, removidos: parsed.removidos || {}, config: parsed.config || null };
+      if (parsed && parsed.lotes) return { lotes: parsed.lotes, removidos: parsed.removidos || {}, config: parsed.config || null, backupDiario: parsed.backupDiario || null };
     }
   } catch (e) {
     console.error('Erro a ler ficheiro de dados, a começar vazio:', e.message);
   }
-  return { lotes: {}, removidos: {}, config: null };
+  return { lotes: {}, removidos: {}, config: null, backupDiario: null };
 }
 
-let store = { lotes: {}, removidos: {}, config: null };
+let store = { lotes: {}, removidos: {}, config: null, backupDiario: null };
 
 // ---- Fallback em ficheiro (só usado quando não há Postgres) ----
 let saveTimer = null;
@@ -201,6 +421,20 @@ async function guardarConfigProvadores(provadores, atualizadoEm) {
     );
   } else {
     persistFile();
+  }
+}
+
+// Guarda o registo de "já foi enviado o backup diário do dia X" — evita reenviar o mesmo dia outra
+// vez se o serviço reiniciar depois da hora combinada (ver verificarBackupDiarioAgendado).
+async function guardarUltimoBackupDiario(info) {
+  if (pool) {
+    await pool.query(
+      `INSERT INTO app_config (chave, valor, atualizado_em) VALUES ('backupDiario', $1, $2)
+       ON CONFLICT (chave) DO UPDATE SET valor = $1, atualizado_em = $2`,
+      [JSON.stringify(info), info.enviadoEm]
+    );
+  } else {
+    persistFile(); // store.backupDiario já foi atualizado antes de chamar isto — persistFile grava o store inteiro
   }
 }
 
@@ -337,6 +571,13 @@ app.put('/api/config', async (req, res) => {
   res.json({ config: store.config });
 });
 
+// Rota de teste manual do backup diário — útil para confirmar que o email chega, sem esperar pela
+// hora agendada. Protegida pela mesma autenticação básica (APP_USER/APP_PASS), se estiver definida.
+app.post('/api/backup-diario/enviar-agora', async (req, res) => {
+  const resultado = await enviarBackupDiario('manual, a pedido');
+  res.json(resultado);
+});
+
 io.on('connection', (socket) => {
   // ao ligar, cada utilizador recebe já o estado atual
   socket.emit('lotes:sync', { lotes: store.lotes, removidos: store.removidos });
@@ -372,7 +613,18 @@ async function start() {
       ? 'A guardar dados em Postgres (DATABASE_URL definido).'
       : 'A guardar dados em ficheiro local/volume (DATABASE_URL não definido).');
     if (!process.env.APP_USER) console.log('(Sem APP_USER/APP_PASS definidos — a app fica acessível a quem tiver o link.)');
+    if (SHAREPOINT_CONFIGURADO) {
+      console.log(`Backup diário ativo — grava no SharePoint (${SHAREPOINT_SITE_HOSTNAME}${SHAREPOINT_SITE_PATH}, pasta "${SHAREPOINT_FOLDER_PATH}"), a partir das ${BACKUP_HORA} (hora de Lisboa)${(mailer && BACKUP_EMAIL_TO) ? ', com email como alternativa se falhar.' : '.'}`);
+    } else if (mailer && BACKUP_EMAIL_TO) {
+      console.log(`Backup diário ativo — por email (destinatário: ${BACKUP_EMAIL_TO}), a partir das ${BACKUP_HORA} (hora de Lisboa). SharePoint ainda não configurado (ver comentário SHAREPOINT_* no topo do server.js).`);
+    } else {
+      console.log('Backup diário DESLIGADO (falta configurar o SharePoint ou SMTP_HOST/SMTP_USER/SMTP_PASS + BACKUP_EMAIL_TO/ALERT_EMAIL_TO no Railway).');
+    }
   });
+  // 1ª verificação pouco depois de arrancar (cobre o caso de reiniciar já depois da hora combinada),
+  // e depois a cada 10 minutos.
+  setTimeout(verificarBackupDiarioAgendado, 30 * 1000);
+  setInterval(verificarBackupDiarioAgendado, 10 * 60 * 1000);
 }
 
 start().catch((e) => {
