@@ -562,6 +562,21 @@ setInterval(()=>{ limparLotesAntigosSeNecessario(); renderAll(); }, 5*60*1000);
 
 /* ==================== ESTADO / DADOS ==================== */
 const STORAGE_KEY = 'provaSensorialRolhas_v2';
+// 30/09/2026, a pedido da Joana, depois de um incidente em que erros 404 no Railway coincidiram com
+// a perda de tudo o que tinha sido feito no dia: além da cópia principal (STORAGE_KEY, sincronizada
+// com o servidor) guarda-se também, neste browser, uma 2ª cópia de segurança só com os dados que
+// importa proteger no dia a dia — os lotes ainda por decidir + os já fechados HOJE (decisao.data =
+// hoje); o resto já vive no Histórico/Postgres e não muda com a mesma frequência. Esta cópia extra
+// serve de rede de segurança SÓ DENTRO DESTE BROWSER — não substitui ter os dados guardados a sério
+// no servidor (ver server.js: Postgres/DATABASE_URL, ou um Volume — é isso que protege de facto contra
+// reinícios/deploys no Railway apagarem tudo).
+const BACKUP_KEY = STORAGE_KEY + '_backupHoje';
+// 30/09/2026: fica a "false" até este aparelho ter feito, com sucesso, a 1ª leitura ao servidor desde
+// que a página abriu. Enquanto for "false", a limpeza automática de lotes atrasados (mais abaixo) não
+// pode apagar NADA — só é seguro decidir "isto está atrasado" depois de sabermos o estado mais recente
+// de todos, não com a cópia local (que pode estar desatualizada há dias num telemóvel que só agora foi
+// reaberto). Ver limparLotesAntigosSeNecessario() e o incidente que levou a esta correção.
+let dadosSincronizadosComServidor = false;
 // Lista de provadores: passou a ser editável (17/09/2026), a partir do painel de administração.
 // DEFAULT_PROVADORES só serve para semear a lista da primeira vez (antes de existir configuração
 // no servidor) — a partir daí, a lista "verdadeira" é state.provadoresLista, sincronizada como
@@ -660,6 +675,51 @@ function aplicarRemovidos(lotes, removidos){
 }
 function guardarLocal(){
   try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }catch(e){}
+  guardarBackupHoje();
+}
+// Lotes que interessa proteger na cópia de segurança de hoje: ainda por decidir (podem ser de
+// qualquer dia, ver lotesDeHoje()) ou já fechados hoje (decisao.data = hoje). Os fechados noutros
+// dias já estão arquivados/no servidor e não mudam a cada gesto do dia a dia.
+function lotesParaBackupHoje(){
+  const hoje = hojeStr();
+  const out = {};
+  Object.keys(state.lotes||{}).forEach(numero=>{
+    const l = state.lotes[numero];
+    if(!l.decisao.final || l.decisao.data===hoje) out[numero] = l;
+  });
+  return out;
+}
+function guardarBackupHoje(){
+  try{
+    localStorage.setItem(BACKUP_KEY, JSON.stringify({ dia: hojeStr(), lotes: lotesParaBackupHoje(), guardadoEm: new Date().toISOString() }));
+  }catch(e){}
+}
+// Ao arrancar, junta de volta qualquer lote que estivesse nesta cópia de segurança mas que, por
+// algum motivo, já não esteja na cópia principal nem no servidor (ex.: STORAGE_KEY corrompido/limpo
+// à parte, ou um problema pontual no servidor) — é só mais uma rede de segurança, nunca apaga nada,
+// só acrescenta o que faltar (mergeLotes só substitui se for mais recente). Devolve quantos lotes
+// foram recuperados, para se poder avisar quem está a usar a app.
+function recuperarBackupHojeSeNecessario(){
+  try{
+    const raw = localStorage.getItem(BACKUP_KEY);
+    if(!raw) return 0;
+    const backup = JSON.parse(raw);
+    if(!backup || !backup.lotes) return 0;
+    const antes = Object.keys(state.lotes||{}).length;
+    state.lotes = mergeLotes(state.lotes, backup.lotes);
+    const depois = Object.keys(state.lotes).length;
+    return depois - antes;
+  }catch(e){ return 0; }
+}
+function mostrarAvisoRecuperacaoBackup(n){
+  const antigo = document.getElementById('avisoRecuperacaoBackup');
+  if(antigo) antigo.remove();
+  const el = document.createElement('div');
+  el.id = 'avisoRecuperacaoBackup';
+  el.style.cssText = 'position:fixed;left:0;right:0;bottom:0;z-index:9999;background:#8a2e21;color:#fff;padding:12px 16px;text-align:center;font-size:14px;font-weight:600;box-shadow:0 -2px 10px rgba(0,0,0,.25);';
+  el.textContent = `Recuperados ${n} lote${n===1?'':'s'} de uma cópia de segurança guardada neste aparelho — não estavam a chegar do servidor. Confirma que está tudo certo e avisa a Joana.`;
+  document.body.appendChild(el);
+  setTimeout(()=>{ el.remove(); }, 12000);
 }
 let syncTimer = null;
 function scheduleSync(){
@@ -774,8 +834,14 @@ async function hydrate(){
   if(!state.lotes) state.lotes = {};
   if(!state.removidos) state.removidos = {};
   migrarTodosLotes(state.lotes);
+  const recuperadosBackup = recuperarBackupHojeSeNecessario(); // 30/09/2026: repõe da cópia de segurança de hoje o que faltar na cópia principal
   aplicarRemovidos(state.lotes, state.removidos); // limpa já da cache local qualquer lote entretanto apagado
   limparLotesDeTeste();
+  if(recuperadosBackup > 0){
+    guardarLocal();
+    console.warn(`Recuperados ${recuperadosBackup} lote(s) da cópia de segurança local — não estavam na cópia principal.`);
+    mostrarAvisoRecuperacaoBackup(recuperadosBackup);
+  }
   renderAll(); // mostra logo o que já estava em cache, sem esperar pela rede
   try{
     const res = await fetch('/api/lotes');
@@ -785,6 +851,7 @@ async function hydrate(){
       state.lotes = mergeLotes(state.lotes, (data && data.lotes) || {});
       aplicarRemovidos(state.lotes, state.removidos);
       limparLotesDeTeste(); // também limpa lotes de teste que já tivessem chegado a sincronizar no servidor
+      dadosSincronizadosComServidor = true; // só a partir daqui é seguro a limpeza automática apagar lotes (ver limparLotesAntigosSeNecessario)
       guardarLocal();
       renderAll();
       scheduleSync(); // se havia alterações feitas offline, sobem agora para o servidor
@@ -1257,11 +1324,19 @@ function lotesDeHoje(){
    máximo uma vez por dia (controlado por state.ultimaLimpezaLotes) e é verificado tanto no
    arranque da app como periodicamente, para apanhar o caso de a app ficar aberta a passar a
    meia-noite sem ninguém fazer refresh. Um lote bloqueado até amanhã (diaPrevisto no futuro)
-   nunca é "atrasado" e nunca é tocado por esta limpeza. */
+   nunca é "atrasado" e nunca é tocado por esta limpeza.
+   30/09/2026: CORREÇÃO DE UM BUG GRAVE — esta função só pode apagar depois de
+   dadosSincronizadosComServidor ser true (1ª leitura ao servidor concluída nesta sessão). Sem esta
+   guarda, um telemóvel que estivesse fechado há vários dias, ao ser reaberto, chamava esta limpeza
+   logo com a CÓPIA LOCAL ANTIGA (antes de saber o que se passou entretanto no servidor) — lotes que,
+   entretanto, já tinham sido corretamente concluídos por outra pessoa noutro aparelho apareciam,
+   nessa cópia local desatualizada, como "ainda por decidir e atrasados", e eram apagados a sério do
+   servidor. Foi isto, muito provavelmente, que causou a perda de dados de 30/09/2026. */
 function lotesAtrasados(){
   return lotesDeHoje().filter(l=> l.diaPrevisto && l.diaPrevisto < hojeStr());
 }
 function limparLotesAntigosSeNecessario(){
+  if(!dadosSincronizadosComServidor) return; // nunca apagar com base só na cópia local, antes de saber o estado real do servidor
   const hoje = hojeStr();
   if(state.ultimaLimpezaLotes === hoje) return;
   const atrasados = lotesAtrasados();
