@@ -427,7 +427,7 @@ textarea#taPrioridadesInputInicio{min-height:110px;font-family:ui-monospace,mono
       <button onclick="identificarLote()">Abrir</button>
     </div>
     <div id="searchResults" class="search-results hidden no-print"></div>
-    <button class="btn-hist-csv no-print" onclick="exportarTabelaLABCsv()">Exportar Histórico (CSV)</button>
+    <button class="btn-hist-csv no-print" onclick="abrirMaisOpcoes()">⋯ Mais opções</button>
   </header>
 
   <main>
@@ -601,6 +601,59 @@ function pedirAcessoAdmin(aoConfirmar){
   // Insensível a maiúsculas/minúsculas — no telemóvel o teclado põe maiúscula na 1ª letra sozinho.
   if((tentativa||'').trim().toLowerCase() !== ADMIN_PASSWORD.toLowerCase()){ alert('Palavra-passe incorreta.'); return; }
   aoConfirmar();
+}
+
+/* ==================== LOGIN NOMEADO PARA AÇÕES SOBRE BACKUPS (01/10/2026, a pedido da Joana) ====
+   Separado do código de supervisão acima (8126 — continua a servir só para editar informações do
+   lote). Aqui, cada uma das 3 pessoas usa o seu próprio nome + password, especificamente para ações
+   sobre backups/restauro — para sabermos sempre QUEM fez o quê, sem depender do código partilhado.
+   Tal como o 8126, é um travão de front-end (não é segurança real — quem tiver o código-fonte vê as
+   passwords); serve para rastreio e para desencorajar quem não devia mexer nisto. Fica registado no
+   servidor (GET/POST /api/auditoria), visível em "Mais Opções -> Registo de Atividade". */
+const ADMIN_USERS = [
+  { nome: 'Tânia Martins', password: 'PP95K8Hy3c' },
+  { nome: 'Vanessa Araújo', password: 'VwxgjhcCnF' },
+  { nome: 'Ana Catarina Silva', password: 'pUpU4pFpiQ' },
+];
+function pedirAcessoNomeado(acaoLabel, aoConfirmar){
+  const modalRoot = document.getElementById('modalRoot');
+  const opcoes = ADMIN_USERS.map(u=>`<option value="${escapeHtml(u.nome)}">${escapeHtml(u.nome)}</option>`).join('');
+  modalRoot.innerHTML = `
+  <div class="overlay" id="overlayAcessoNomeado">
+    <div class="modal">
+      <button class="modal-close" onclick="closeModal('overlayAcessoNomeado')">&times;</button>
+      <h2>Confirmar identidade</h2>
+      <div class="sub">Ação: <strong>${escapeHtml(acaoLabel)}</strong>. Fica registado quem a fez, para rastreio.</div>
+      <div class="field"><label>Quem és</label>
+        <select id="fAcessoNome">${opcoes}</select>
+      </div>
+      <div class="field"><label>Password</label><input id="fAcessoPassword" type="password"></div>
+      <div class="actions-row">
+        <button class="btn" onclick="closeModal('overlayAcessoNomeado')">Cancelar</button>
+        <button class="btn btn-primary" onclick="confirmarAcessoNomeado()">Confirmar</button>
+      </div>
+    </div>
+  </div>`;
+  window.__acessoNomeadoConfirmar = aoConfirmar;
+  setTimeout(()=> { const el = document.getElementById('fAcessoPassword'); if(el) el.focus(); }, 50);
+}
+function confirmarAcessoNomeado(){
+  const nome = document.getElementById('fAcessoNome').value;
+  const password = document.getElementById('fAcessoPassword').value;
+  const utilizador = ADMIN_USERS.find(u=>u.nome===nome);
+  if(!utilizador || password !== utilizador.password){ alert('Password incorreta para ' + nome + '.'); return; }
+  const aoConfirmar = window.__acessoNomeadoConfirmar;
+  window.__acessoNomeadoConfirmar = null;
+  closeModal('overlayAcessoNomeado');
+  if(aoConfirmar) aoConfirmar(nome);
+}
+// Grava no servidor quem fez o quê — nunca bloqueia a ação em si (se a rede falhar, a ação já foi
+// feita na mesma; só o registo é que pode ficar em falta, e fica um aviso na consola).
+function registarAtividade(nome, acao, detalhe){
+  fetch('/api/auditoria', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ nome, acao, detalhe: detalhe||'' })
+  }).catch(()=>{ console.warn('Não foi possível registar esta atividade no servidor (sem ligação?) — a ação em si foi feita na mesma.'); });
 }
 
 /* ==================== SINCRONIZAÇÃO PARTILHADA (servidor + Socket.IO) ====================
@@ -1288,6 +1341,16 @@ function formatarDataBR(iso){
   if(!iso) return '—';
   const d = iso.slice(0,10);
   return `${d.slice(8,10)}/${d.slice(5,7)}/${d.slice(0,4)}`;
+}
+// Igual a formatarDataBR, mas inclui a hora local do aparelho — usado no Registo de Atividade
+// (01/10/2026), onde a hora exata de cada ação importa para cruzar com o que aconteceu.
+function formatarDataHoraBR(iso){
+  if(!iso) return '—';
+  const d = new Date(iso);
+  if(isNaN(d.getTime())) return formatarDataBR(iso);
+  const hh = String(d.getHours()).padStart(2,'0');
+  const mm = String(d.getMinutes()).padStart(2,'0');
+  return `${formatarDataBR(iso)} ${hh}:${mm}`;
 }
 function escapeHtml(s){ return (s||'').toString().replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 function todosLotes(){ return Object.values(state.lotes).sort((a,b)=> prioRank(b.prioridade)-prioRank(a.prioridade) || (b.atualizadoEm||'').localeCompare(a.atualizadoEm||'')); }
@@ -2061,6 +2124,178 @@ document.addEventListener('click', (e)=>{
 });
 
 function closeModal(id){ const el = document.getElementById(id); if(el) el.remove(); }
+
+/* ==================== MAIS OPÇÕES (01/10/2026, a pedido da Joana) ====================
+   Agrupa as ações secundárias (exportar, backups/restauro) num único menu, para não encher o
+   cabeçalho de botões. ==================== */
+function abrirMaisOpcoes(){
+  const modalRoot = document.getElementById('modalRoot');
+  modalRoot.innerHTML = `
+  <div class="overlay" id="overlayMaisOpcoes">
+    <div class="modal">
+      <button class="modal-close" onclick="closeModal('overlayMaisOpcoes')">&times;</button>
+      <h2>Mais opções</h2>
+      <div class="actions-row" style="flex-direction:column;gap:8px;">
+        <button class="btn" style="width:100%;" onclick="closeModal('overlayMaisOpcoes'); exportarTabelaLABCsv();">Exportar Histórico (CSV)</button>
+        <button class="btn" style="width:100%;" onclick="abrirBackupsDiarios();">Backups diários / Restaurar</button>
+        <button class="btn" style="width:100%;" onclick="abrirRegistoAtividade();">Registo de Atividade</button>
+      </div>
+    </div>
+  </div>`;
+}
+
+/* ==================== REGISTO DE ATIVIDADE (01/10/2026, a pedido da Joana) ====================
+   Mostra quem usou o login nomeado (ver ADMIN_USERS/pedirAcessoNomeado) para ações sobre backups —
+   o quê, quem e quando — para haver sempre rastreio de quem mexeu nisto. */
+async function abrirRegistoAtividade(){
+  const modalRoot = document.getElementById('modalRoot');
+  modalRoot.innerHTML = `
+  <div class="overlay" id="overlayRegistoAtividade">
+    <div class="modal">
+      <button class="modal-close" onclick="closeModal('overlayRegistoAtividade')">&times;</button>
+      <h2>Registo de Atividade</h2>
+      <div class="sub">Ações sensíveis feitas com login nomeado (ex.: restaurar um backup) — quem, o quê e quando.</div>
+      <div id="listaRegistoAtividade" style="margin-top:14px;">A carregar...</div>
+    </div>
+  </div>`;
+  try{
+    const res = await fetch('/api/auditoria');
+    const data = await res.json();
+    const entradas = (data && data.auditoria) || [];
+    const el = document.getElementById('listaRegistoAtividade');
+    if(!el) return;
+    if(!entradas.length){
+      el.innerHTML = '<div class="sr-empty">Ainda não há nenhuma atividade registada.</div>';
+      return;
+    }
+    el.innerHTML = entradas.map(e=>`
+      <div class="sr-item" style="cursor:default;">
+        <div><span class="sr-num">${escapeHtml(e.nome||'')}</span></div>
+        <div class="sr-meta">${escapeHtml(e.acao||'')}${e.detalhe?` — ${escapeHtml(e.detalhe)}`:''}<br>${formatarDataHoraBR(e.quando||'')}</div>
+      </div>`).join('');
+  }catch(e){
+    const el = document.getElementById('listaRegistoAtividade');
+    if(el) el.innerHTML = '<div class="sr-empty">Não foi possível ligar ao servidor para ver o registo de atividade.</div>';
+  }
+}
+
+/* ==================== BACKUPS DIÁRIOS + RESTAURO (Opção B, 01/10/2026) ====================
+   Lista e permite descarregar as cópias de segurança que o servidor guarda sozinho todos os dias,
+   mesmo sem SharePoint nem email configurados — ficam gravadas em disco no Railway (ver BACKUPS_DIR
+   no server.js). Também dá para forçar já o backup de hoje, e para RESTAURAR a partir de um backup
+   anterior se uma atualização ou um bug deixar a app num estado errado (NOK).
+   Restaurar NUNCA apaga nem substitui nada do que já está na app agora — só repõe lotes que estejam
+   em falta (ex.: apagados por engano por um bug, como aconteceu em 01/10/2026). Isto porque o backup
+   é sempre de um momento passado; qualquer lote já presente é, por definição, mais recente ou igual
+   ao que está no backup, por isso nunca faz sentido sobrepor-se ao que já lá está. */
+async function abrirBackupsDiarios(){
+  const modalRoot = document.getElementById('modalRoot');
+  modalRoot.innerHTML = `
+  <div class="overlay" id="overlayBackups">
+    <div class="modal">
+      <button class="modal-close" onclick="closeModal('overlayBackups')">&times;</button>
+      <h2>Backups diários</h2>
+      <div class="sub">Cópias de segurança guardadas automaticamente no servidor, dia a dia. "Restaurar" nunca apaga nem altera o que já está na app — só repõe lotes que estejam em falta.</div>
+      <div class="actions-row">
+        <button class="btn btn-primary" onclick="restaurarVersaoAnterior()">Restaurar versão anterior (último backup)</button>
+        <button class="btn" onclick="forcarBackupAgora()">Gerar backup de hoje agora</button>
+      </div>
+      <div id="listaBackupsDiarios" style="margin-top:14px;">A carregar...</div>
+    </div>
+  </div>`;
+  await carregarListaBackupsDiarios();
+}
+async function carregarListaBackupsDiarios(){
+  const el = document.getElementById('listaBackupsDiarios');
+  if(!el) return;
+  try{
+    const res = await fetch('/api/backup-diario/listar');
+    const data = await res.json();
+    const backups = (data && data.backups) || [];
+    if(!backups.length){
+      el.innerHTML = '<div class="sr-empty">Ainda não há nenhum backup guardado.</div>';
+      return;
+    }
+    el.innerHTML = backups.map(b=>`
+      <div class="sr-item" style="cursor:default;">
+        <div><span class="sr-num">${escapeHtml(b.dia)}</span></div>
+        <div class="sr-meta">
+          ${b.csv ? `<a href="/api/backup-diario/${encodeURIComponent(b.dia)}/download?formato=csv">CSV</a>` : ''}
+          ${b.json ? ` · <a href="/api/backup-diario/${encodeURIComponent(b.dia)}/download?formato=json">JSON</a>` : ''}
+          ${b.json ? ` · <a href="#" onclick="event.preventDefault(); restaurarDeBackup('${escapeHtml(b.dia)}');">Restaurar este dia</a>` : ''}
+        </div>
+      </div>`).join('');
+  }catch(e){
+    el.innerHTML = '<div class="sr-empty">Não foi possível ligar ao servidor para listar os backups.</div>';
+  }
+}
+async function forcarBackupAgora(){
+  const el = document.getElementById('listaBackupsDiarios');
+  if(el) el.innerHTML = 'A gerar o backup de hoje...';
+  try{
+    const res = await fetch('/api/backup-diario/enviar-agora', { method:'POST' });
+    const data = await res.json();
+    console.log('Resultado do backup manual:', data);
+  }catch(e){
+    console.warn('Erro ao gerar backup manual:', e);
+  }
+  await carregarListaBackupsDiarios();
+}
+// Restaura a partir do backup mais recente disponível (tipicamente o de ontem, já que o de hoje só
+// fica pronto perto do fim do dia) — é o atalho de "volta tudo ao que estava OK" pedido pela Joana.
+// Pede sempre identificação nomeada primeiro (ver pedirAcessoNomeado) — fica registado quem restaurou.
+function restaurarVersaoAnterior(){
+  pedirAcessoNomeado('Restaurar versão anterior (último backup)', (nome)=>{
+    executarRestauroUltimoBackup(nome);
+  });
+}
+async function executarRestauroUltimoBackup(nome){
+  try{
+    const res = await fetch('/api/backup-diario/listar');
+    const data = await res.json();
+    const backups = ((data && data.backups) || []).filter(b=>b.json);
+    if(!backups.length){ alert('Ainda não há nenhum backup disponível para restaurar.'); return; }
+    await executarRestauroDeBackup(backups[0].dia, nome);
+  }catch(e){
+    alert('Não foi possível ligar ao servidor para restaurar.');
+  }
+}
+// Restaura a partir do backup de um dia específico. Pede sempre identificação nomeada primeiro.
+function restaurarDeBackup(dia){
+  pedirAcessoNomeado(`Restaurar backup de ${dia}`, (nome)=>{
+    executarRestauroDeBackup(dia, nome);
+  });
+}
+// Só acrescenta lotes em falta — nunca toca num lote que já exista na app agora (ver nota acima da
+// definição de abrirBackupsDiarios). Regista sempre no fim quem fez o quê (ver registarAtividade).
+async function executarRestauroDeBackup(dia, nome){
+  if(!confirm(`Vais repor, a partir do backup de ${dia}, qualquer lote que esteja em falta na app agora. Nada do que já está na app é apagado ou alterado. Confirmas?`)) return;
+  try{
+    const res = await fetch(`/api/backup-diario/${encodeURIComponent(dia)}/download?formato=json`);
+    if(!res.ok){ alert('Não foi possível obter esse backup do servidor.'); return; }
+    const data = await res.json();
+    const lotesBackup = (data && data.lotes) || {};
+    let repostos = 0;
+    Object.keys(lotesBackup).forEach(numero=>{
+      if(state.lotes[numero]) return; // já existe — nunca sobrepõe trabalho atual
+      const restaurado = { ...lotesBackup[numero] };
+      restaurado.atualizadoEm = new Date().toISOString(); // mais recente que qualquer tombstone antigo, para o servidor aceitar
+      state.lotes[numero] = restaurado;
+      delete state.removidos[numero];
+      repostos++;
+    });
+    if(repostos > 0){
+      migrarTodosLotes(state.lotes);
+      saveState();
+      renderAll();
+    }
+    registarAtividade(nome, `Restaurou backup de ${dia}`, `${repostos} lote(s) repostos`);
+    alert(repostos > 0 ? `Repostos ${repostos} lote(s) a partir do backup de ${dia}.` : `Nenhum lote em falta — a app já tinha tudo o que está nesse backup de ${dia}.`);
+    closeModal('overlayBackups');
+  }catch(e){
+    alert('Erro ao restaurar: ' + (e && e.message ? e.message : e));
+  }
+}
 
 /* ==================== DETALHE DO LOTE ==================== */
 function openLoteDetail(numero){
