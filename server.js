@@ -216,20 +216,27 @@ async function enviarBackupDiario(motivo) {
   const csv = construirCsvBackupDiario(lotesDia);
   const jsonCompleto = JSON.stringify({ dia, lotes: lotesDia }, null, 2);
 
+  // Opção B (01/10/2026): grava sempre localmente primeiro, independentemente de SharePoint/email
+  // estarem configurados ou funcionarem — é a rede de segurança que nunca depende de nada externo.
+  const guardadoLocalmente = gravarBackupLocal(dia, csv, jsonCompleto);
+
   const viaSharePoint = await enviarBackupParaSharePoint(dia, csv, jsonCompleto);
-  if (viaSharePoint.enviado) return { enviado: true, via: 'sharepoint', dia, total };
+  if (viaSharePoint.enviado) return { enviado: true, via: 'sharepoint', dia, total, guardadoLocalmente };
 
   const viaEmail = await enviarBackupPorEmail(dia, csv, jsonCompleto, motivo);
-  if (viaEmail.enviado) return { enviado: true, via: 'email', dia, total, avisoSharePoint: viaSharePoint.motivo };
+  if (viaEmail.enviado) return { enviado: true, via: 'email', dia, total, avisoSharePoint: viaSharePoint.motivo, guardadoLocalmente };
 
-  return { enviado: false, dia, total, motivoSharePoint: viaSharePoint.motivo, motivoEmail: viaEmail.motivo };
+  // Mesmo sem SharePoint nem email, se pelo menos ficou gravado localmente já não é um falhanço
+  // completo — os dados continuam recuperáveis a partir do próprio Railway.
+  return { enviado: guardadoLocalmente, via: guardadoLocalmente ? 'local' : undefined, dia, total, motivoSharePoint: viaSharePoint.motivo, motivoEmail: viaEmail.motivo, guardadoLocalmente };
 }
 // Verifica, de tempos a tempos, se já passou da hora combinada (BACKUP_HORA) e ainda não foi feito
 // o backup de hoje — corre uma vez a seguir ao arranque e depois a cada 10 minutos. O registo de
 // "já feito hoje" fica persistido (store.backupDiario), tal como os lotes, para não repetir o mesmo
 // dia outra vez caso o serviço reinicie depois da hora combinada.
 async function verificarBackupDiarioAgendado() {
-  if (!SHAREPOINT_CONFIGURADO && !(mailer && BACKUP_EMAIL_TO)) return; // nada configurado, nem vale a pena tentar
+  // 01/10/2026: já não há "return" por falta de SharePoint/email — a cópia local (Opção B) não
+  // depende de nenhum dos dois, por isso o backup diário agendado corre sempre.
   const dia = hojeStrLisboa();
   if (store.backupDiario && store.backupDiario.data === dia) return; // já feito hoje
   if (horaAtualLisboa() < BACKUP_HORA) return; // ainda não chegou a hora
@@ -267,6 +274,51 @@ if (DATABASE_URL) {
 const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, 'data');
 const DATA_FILE = path.join(DATA_DIR, 'lotes.json');
 if (!pool && !fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
+
+// ---------- Cópia de segurança diária — Opção B: guardar sempre uma cópia dentro da própria app
+// (01/10/2026, a pedido da Joana, depois de descobrirmos que o SMTP da empresa ainda não está
+// configurado): mesmo sem SharePoint nem email prontos, o backup do dia fica sempre gravado aqui,
+// sem precisar de nenhuma conta nem acesso de administrador — é só um ficheiro em disco. Pode ser
+// descarregado a partir da própria app (ecrã Logística -> "Backups diários").
+// IMPORTANTE para sobreviver a reinícios/deploys do Railway: esta pasta precisa de estar dentro de um
+// Volume persistente ligado ao serviço (Railway -> serviço da app -> Settings -> Volumes -> Add Volume,
+// ex. mount path "/data") e a variável BACKUPS_DIR definida para lá apontar (ex.
+// BACKUPS_DIR=/data/backups). Sem Volume, os ficheiros continuam a poder ser descarregados até ao
+// próximo deploy/reinício do serviço, mas depois perdem-se (tal como aconteceria com qualquer ficheiro
+// local no Railway sem Volume).
+const BACKUPS_DIR = process.env.BACKUPS_DIR || path.join(DATA_DIR, 'backups');
+if (!fs.existsSync(BACKUPS_DIR)) fs.mkdirSync(BACKUPS_DIR, { recursive: true });
+// Só aceita datas no formato AAAA-MM-DD, para nunca deixar escolher um caminho de ficheiro arbitrário
+// a partir do nome recebido no pedido (proteção simples contra path traversal).
+function diaValido(dia) {
+  return typeof dia === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(dia);
+}
+function gravarBackupLocal(dia, csv, jsonCompleto) {
+  try {
+    fs.writeFileSync(path.join(BACKUPS_DIR, `${dia}.csv`), csv, 'utf8');
+    fs.writeFileSync(path.join(BACKUPS_DIR, `${dia}.json`), jsonCompleto, 'utf8');
+    return true;
+  } catch (e) {
+    console.error('Erro a gravar o backup diário localmente (BACKUPS_DIR):', e.message);
+    return false;
+  }
+}
+function listarBackupsLocais() {
+  try {
+    const ficheiros = fs.readdirSync(BACKUPS_DIR);
+    const porDia = {};
+    ficheiros.forEach((nome) => {
+      const m = nome.match(/^(\d{4}-\d{2}-\d{2})\.(csv|json)$/);
+      if (!m) return;
+      const [, dia, ext] = m;
+      if (!porDia[dia]) porDia[dia] = { dia, csv: false, json: false };
+      porDia[dia][ext] = true;
+    });
+    return Object.values(porDia).sort((a, b) => b.dia.localeCompare(a.dia));
+  } catch (e) {
+    return [];
+  }
+}
 
 // ---------- Reset total no arranque (opcional, controlado pelo Railway) ----------
 // Define a variável de ambiente WIPE_DATA_ON_START=true no Railway (Settings -> Variables) e
@@ -331,24 +383,31 @@ async function loadStore() {
       } catch (e) {
         console.error('Erro a ler o registo do backup diário da base de dados:', e.message);
       }
-      return { lotes, removidos, config, backupDiario };
+      let auditoria = [];
+      try {
+        const { rows: rowsAuditoria } = await pool.query("SELECT valor FROM app_config WHERE chave = 'auditoria'");
+        if (rowsAuditoria.length && Array.isArray(rowsAuditoria[0].valor)) auditoria = rowsAuditoria[0].valor;
+      } catch (e) {
+        console.error('Erro a ler o registo de atividade da base de dados:', e.message);
+      }
+      return { lotes, removidos, config, backupDiario, auditoria };
     } catch (e) {
       console.error('Erro a ler da base de dados, a começar vazio:', e.message);
-      return { lotes: {}, removidos: {}, config: null, backupDiario: null };
+      return { lotes: {}, removidos: {}, config: null, backupDiario: null, auditoria: [] };
     }
   }
   try {
     if (fs.existsSync(DATA_FILE)) {
       const parsed = JSON.parse(fs.readFileSync(DATA_FILE, 'utf8'));
-      if (parsed && parsed.lotes) return { lotes: parsed.lotes, removidos: parsed.removidos || {}, config: parsed.config || null, backupDiario: parsed.backupDiario || null };
+      if (parsed && parsed.lotes) return { lotes: parsed.lotes, removidos: parsed.removidos || {}, config: parsed.config || null, backupDiario: parsed.backupDiario || null, auditoria: parsed.auditoria || [] };
     }
   } catch (e) {
     console.error('Erro a ler ficheiro de dados, a começar vazio:', e.message);
   }
-  return { lotes: {}, removidos: {}, config: null, backupDiario: null };
+  return { lotes: {}, removidos: {}, config: null, backupDiario: null, auditoria: [] };
 }
 
-let store = { lotes: {}, removidos: {}, config: null, backupDiario: null };
+let store = { lotes: {}, removidos: {}, config: null, backupDiario: null, auditoria: [] };
 
 // ---- Fallback em ficheiro (só usado quando não há Postgres) ----
 let saveTimer = null;
@@ -435,6 +494,25 @@ async function guardarUltimoBackupDiario(info) {
     );
   } else {
     persistFile(); // store.backupDiario já foi atualizado antes de chamar isto — persistFile grava o store inteiro
+  }
+}
+
+// ---------- Registo de atividade (01/10/2026, a pedido da Joana) ----------
+// Separado do código de supervisão (ADMIN_PASSWORD "8126" no index.html, que continua a servir só
+// para editar informações do lote) — este é um login próprio, com nome + password individual para
+// cada uma das pessoas, usado especificamente para ações sobre os BACKUPS/RESTAURO (e outras ações
+// sensíveis semelhantes que venham a precisar do mesmo nível de rastreio). Cada vez que uma destas
+// ações é usada, fica guardado quem foi, quando e o quê — consultável no ecrã "Registo de Atividade"
+// dentro da app (Mais Opções). Guarda sempre as últimas 300 entradas (mais antigas vão caindo).
+async function guardarAuditoria(lista) {
+  if (pool) {
+    await pool.query(
+      `INSERT INTO app_config (chave, valor, atualizado_em) VALUES ('auditoria', $1, $2)
+       ON CONFLICT (chave) DO UPDATE SET valor = $1, atualizado_em = $2`,
+      [JSON.stringify(lista), new Date().toISOString()]
+    );
+  } else {
+    persistFile(); // store.auditoria já foi atualizado antes de chamar isto
   }
 }
 
@@ -578,6 +656,48 @@ app.post('/api/backup-diario/enviar-agora', async (req, res) => {
   res.json(resultado);
 });
 
+// Opção B (01/10/2026): lista os backups diários guardados localmente (BACKUPS_DIR), para a app
+// mostrar um ecrã simples de onde descarregar qualquer dia disponível — sem precisar de SharePoint
+// nem de email configurados.
+app.get('/api/backup-diario/listar', (req, res) => {
+  res.json({ backups: listarBackupsLocais() });
+});
+// Descarrega o ficheiro de um dia específico (csv ou json). "dia" tem de bater com AAAA-MM-DD —
+// qualquer outro formato é recusado, para nunca ler um caminho fora de BACKUPS_DIR.
+app.get('/api/backup-diario/:dia/download', (req, res) => {
+  const dia = req.params.dia;
+  const formato = req.query.formato === 'json' ? 'json' : 'csv';
+  if (!diaValido(dia)) return res.status(400).json({ erro: 'data inválida — usa o formato AAAA-MM-DD' });
+  const ficheiro = path.join(BACKUPS_DIR, `${dia}.${formato}`);
+  if (!fs.existsSync(ficheiro)) return res.status(404).json({ erro: `não há backup de ${dia} em formato ${formato}` });
+  res.download(ficheiro, `prova-sensorial-backup-${dia}.${formato}`);
+});
+
+// Lista as últimas entradas do registo de atividade (mais recente primeiro).
+app.get('/api/auditoria', (req, res) => {
+  const lista = (store.auditoria || []).slice().reverse();
+  res.json({ auditoria: lista });
+});
+// Regista uma nova ação sensível (ex.: restaurar um backup) — nome e password já vêm validados pelo
+// cliente (ver ADMIN_USERS no index.html; é um travão de front-end, tal como o código 8126 — não é
+// segurança real, serve para rastreio e para desencorajar quem não deveria estar a mexer nisto).
+app.post('/api/auditoria', async (req, res) => {
+  const nome = (req.body && req.body.nome || '').trim();
+  const acao = (req.body && req.body.acao || '').trim();
+  const detalhe = (req.body && req.body.detalhe || '').trim();
+  if (!nome || !acao) return res.status(400).json({ ok: false, erro: 'nome e ação são obrigatórios' });
+  const entrada = { nome, acao, detalhe, quando: new Date().toISOString() };
+  store.auditoria = store.auditoria || [];
+  store.auditoria.push(entrada);
+  if (store.auditoria.length > 300) store.auditoria = store.auditoria.slice(-300);
+  try {
+    await guardarAuditoria(store.auditoria);
+  } catch (e) {
+    console.error('Erro a guardar o registo de atividade:', e.message);
+  }
+  res.json({ ok: true, entrada });
+});
+
 io.on('connection', (socket) => {
   // ao ligar, cada utilizador recebe já o estado atual
   socket.emit('lotes:sync', { lotes: store.lotes, removidos: store.removidos });
@@ -618,7 +738,7 @@ async function start() {
     } else if (mailer && BACKUP_EMAIL_TO) {
       console.log(`Backup diário ativo — por email (destinatário: ${BACKUP_EMAIL_TO}), a partir das ${BACKUP_HORA} (hora de Lisboa). SharePoint ainda não configurado (ver comentário SHAREPOINT_* no topo do server.js).`);
     } else {
-      console.log('Backup diário DESLIGADO (falta configurar o SharePoint ou SMTP_HOST/SMTP_USER/SMTP_PASS + BACKUP_EMAIL_TO/ALERT_EMAIL_TO no Railway).');
+      console.log(`Backup diário — SharePoint e email ainda não configurados; a gravar só localmente (BACKUPS_DIR="${BACKUPS_DIR}"), a partir das ${BACKUP_HORA} (hora de Lisboa). Descarregável em "Backups diários" (ecrã Logística). Para sobreviver a reinícios do Railway, liga um Volume persistente a esta pasta (ver comentário BACKUPS_DIR no topo do server.js).`);
     }
   });
   // 1ª verificação pouco depois de arrancar (cobre o caso de reiniciar já depois da hora combinada),
