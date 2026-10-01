@@ -1318,12 +1318,16 @@ function lotesDeHoje(){
 /* 29/09/2026, a pedido da Joana: a limpeza do ecrã "Lotes" já não pode depender de alguém da
    equipa se lembrar de apagar os atrasados. A partir de agora, assim que passa a meia-noite
    (novo dia no calendário local do aparelho), qualquer lote ainda por decidir cujo dia previsto
-   seja anterior a hoje é eliminado automaticamente — independentemente de ter sido trabalhado ou
-   não, sem código de administração e sem confirmação de ninguém. O ecrã "Lotes" fica limpo
-   sozinho e só volta a ter lotes à medida que forem sendo lidos/criados de novo. Isto corre no
-   máximo uma vez por dia (controlado por state.ultimaLimpezaLotes) e é verificado tanto no
-   arranque da app como periodicamente, para apanhar o caso de a app ficar aberta a passar a
-   meia-noite sem ninguém fazer refresh. Um lote bloqueado até amanhã (diaPrevisto no futuro)
+   seja anterior a hoje é eliminado automaticamente — sem código de administração e sem confirmação
+   de ninguém. O ecrã "Lotes" fica limpo sozinho e só volta a ter lotes à medida que forem sendo
+   lidos/criados de novo. Isto corre no máximo uma vez por dia (controlado por
+   state.ultimaLimpezaLotes) e é verificado tanto no arranque da app como periodicamente, para
+   apanhar o caso de a app ficar aberta a passar a meia-noite sem ninguém fazer refresh.
+   01/10/2026, CORREÇÃO IMPORTANTE a pedido da Joana: um lote já em WIP (já tem Provador 1 a
+   trabalhar) NUNCA é tocado por esta limpeza, mesmo que o dia previsto já tenha passado — só os
+   lotes totalmente por começar (Planeado, sem nenhum provador ainda) é que são apagados sozinhos.
+   Isto porque, na prática, apagar um lote a meio de uma prova real (alguém já estava a trabalhar
+   nele) é bem mais grave do que limpar um que ninguém sequer tinha aberto. Um lote bloqueado até amanhã (diaPrevisto no futuro)
    nunca é "atrasado" e nunca é tocado por esta limpeza.
    30/09/2026: CORREÇÃO DE UM BUG GRAVE — esta função só pode apagar depois de
    dadosSincronizadosComServidor ser true (1ª leitura ao servidor concluída nesta sessão). Sem esta
@@ -1333,7 +1337,9 @@ function lotesDeHoje(){
    nessa cópia local desatualizada, como "ainda por decidir e atrasados", e eram apagados a sério do
    servidor. Foi isto, muito provavelmente, que causou a perda de dados de 30/09/2026. */
 function lotesAtrasados(){
-  return lotesDeHoje().filter(l=> l.diaPrevisto && l.diaPrevisto < hojeStr());
+  // só lotes totalmente por começar (sem Provador 1) — um lote já em WIP fica sempre de fora,
+  // mesmo atrasado (ver nota de 01/10/2026 acima).
+  return lotesDeHoje().filter(l=> l.diaPrevisto && l.diaPrevisto < hojeStr() && !l.provador1);
 }
 function limparLotesAntigosSeNecessario(){
   if(!dadosSincronizadosComServidor) return; // nunca apagar com base só na cópia local, antes de saber o estado real do servidor
