@@ -1204,8 +1204,27 @@ function analiseCoincidenciaP1P2(lote){
    caso conta-se a união dos três, que é a própria decisão final (ver tentarAutoFinalizar). */
 function tallyResumoLAB(lote){
   if(lote.registos.p3 && lote.registos.p3.concluido){
-    const det = uniaoTallyDetalhada(lote);
-    return { tca: det.tcaForte + det.tcaPercetivel, mofo: det.mofoForte + det.mofoPercetivel, outros: det.outros };
+    // 14/10/2026, a pedido da Joana (caso real com 3 provadores: a tabela mostrava 7/4/3 = união de
+    // todos os frascos, quando o correto era 5/4/1): com 3 provadores, só contam os frascos marcados
+    // por PELO MENOS 2 dos 3 provadores (em comum), e cada um conta pelo composto MAIS FORTE
+    // assinalado por qualquer dos que o marcaram (hierarquia TCA > Mofo > Outro). Um frasco marcado
+    // por um só provador continua a aparecer na tabela "Frascos com Aroma", mas não entra nesta contagem.
+    const porFrasco = {};
+    ['p1','p2','p3'].forEach(p=>{
+      (lote.registos[p].itens||[]).forEach(it=>{
+        const t = tipoFrasco(it);
+        if(!t) return;
+        (porFrasco[it.frasco] = porFrasco[it.frasco]||[]).push(t);
+      });
+    });
+    let tca=0, mofo=0, outros=0;
+    Object.keys(porFrasco).forEach(n=>{
+      const tipos = porFrasco[n];
+      if(tipos.length < 2) return; // só um provador marcou — não conta
+      const tipo = combinarTipo(tipos);
+      if(tipo==='tca') tca++; else if(tipo==='mofo') mofo++; else if(tipo==='outro') outros++;
+    });
+    return { tca, mofo, outros };
   }
   const analise = analiseCoincidenciaP1P2(lote);
   return { tca: analise.tca, mofo: analise.mofo, outros: analise.outros };
