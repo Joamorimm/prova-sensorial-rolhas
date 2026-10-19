@@ -609,6 +609,7 @@ const ADMIN_USERS = [
   { nome: 'Tânia Martins', password: 'PP95K8Hy3c' },
   { nome: 'Vanessa Araújo', password: 'VwxgjhcCnF' },
   { nome: 'Ana Catarina Silva', password: 'pUpU4pFpiQ' },
+  { nome: 'Tânia Gonçalves', password: 'xD8D3iGfDG' }, // adicionada a 19/10/2026
 ];
 function pedirAcessoNomeado(acaoLabel, aoConfirmar){
   const modalRoot = document.getElementById('modalRoot');
@@ -1684,11 +1685,21 @@ function renderTabelaHistoricoLAB(){
       </div>
     </details>`).join('');
 }
+/* 19/10/2026, a pedido da Joana: no CSV, cada provador tem a sua própria coluna, com o nome seguido
+   dos frascos que assinalou — ex.: "Tânia Lino F8:TCA-P; F19:TCA-P" — em vez de tudo numa só coluna. */
+function textoProvadorCsv(lote, p){
+  const nome = lote['provador'+p.slice(1)] || '';
+  const frascos = (lote.registos[p].itens||[])
+    .filter(it=> codAroma(it))
+    .sort((a,b)=> a.frasco-b.frasco)
+    .map(it=> `F${it.frasco}:${codAroma(it)}`).join('; ');
+  return [nome, frascos].filter(Boolean).join(' ');
+}
 function exportarTabelaLABCsv(){
   const lotes = linhasHistoricoLAB();
   if(!lotes.length){ alert('Não há lotes no histórico para exportar.'); return; }
-  const header = ['Data','Nº Lote','Prioridade','Bartops','Provador 1','Provador 2','Provador 3','Estado','Frascos com Aroma'];
-  const rows = lotes.map(l=> [l.decisao.data||'', l.numeroLote, prioLetraLAB(l.prioridade), l.bartops?'Sim':'', l.provador1||'', l.provador2||'', l.provador3||'', 'Prova Concluída', textoFrascosLoteCsv(l)]);
+  const header = ['Data','Nº Lote','Prioridade','Bartops','Estado','Provador 1','Provador 2','Provador 3'];
+  const rows = lotes.map(l=> [l.decisao.data||'', l.numeroLote, prioLetraLAB(l.prioridade), l.bartops?'Sim':'', 'Prova Concluída', textoProvadorCsv(l,'p1'), textoProvadorCsv(l,'p2'), textoProvadorCsv(l,'p3')]);
   const csv = [header, ...rows].map(r=> r.map(v=>`"${String(v??'').replace(/"/g,'""')}"`).join(';')).join('\n');
   const blob = new Blob(['﻿'+csv], {type:'text/csv;charset=utf-8;'});
   const url = URL.createObjectURL(blob);
