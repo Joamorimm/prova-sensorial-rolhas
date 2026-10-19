@@ -347,7 +347,7 @@ legend{font-size:11.5px;font-weight:800;color:var(--muted);padding:0 6px;text-tr
 
 /* LAB: 3 colunas lado a lado (Planeados/WIP/Concluídos), visíveis de imediato, sem separadores —
    só o nº do lote (+ letra U/P quando aplicável); clicar abre a ficha do lote com o resto da informação. */
-.lab-colunas{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:6px 0 14px;}
+.lab-colunas{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin:6px 0 14px;}
 /* 29/09/2026, a pedido da Joana: quando uma coluna (normalmente "Concluídos") tem mais lotes do que
    cabem no ecrã, a coluna já não estica a página toda para baixo — fica com altura limitada e ganha
    scroll próprio (barra de scroll do rato/dedo), como um dropdown. Os lotes de hoje continuam TODOS
@@ -459,11 +459,6 @@ textarea#taPrioridadesInputInicio{min-height:110px;font-family:ui-monospace,mono
     <section id="view-lab" class="view hidden">
       <div class="section-title">LAB — Estado das Provas</div>
       <div class="lab-colunas">
-        <div class="lab-col">
-          <div class="lab-col-titulo">Planeados <span class="n" id="labContPlaneados">0</span>
-          </div>
-          <div class="lab-col-lista" id="labColPlaneados"></div>
-        </div>
         <div class="lab-col">
           <div class="lab-col-titulo">WIP <span class="n" id="labContWip">0</span>
           </div>
@@ -683,6 +678,7 @@ function garantirCamposNovos(l){
     l.provaAbertaEm = (l.registos.p1 && l.registos.p1.assinadoEm) || l.atualizadoEm || l.criadoEm || new Date().toISOString();
   }
   if(l.avisoDuplicado===undefined) l.avisoDuplicado = false;
+  if(!Array.isArray(l.rondasAnteriores)) l.rondasAnteriores = []; // provas anteriores do mesmo nº (repescagem, 16/10/2026)
   // Migração (21/09/2026): lotes decididos ANTES de "aprovado"/"rejeitado" deixarem de existir ainda
   // têm essas palavras gravadas em decisao.final (vindas do servidor/localStorage antigo). Sem isto,
   // o resto da app (que só reconhece 'concluido') trata-os como "ainda não decidido" — é o que fazia
@@ -963,6 +959,7 @@ function criarLoteVazio(numero){
     // importação do dia (ex: 2 linhas na folha "Amostragens" com o mesmo FILE, ambas marcadas
     // Sensorial) — fica marcado para avisar a Produção/quem pegar no lote que pode haver engano.
     avisoDuplicado: false,
+    rondasAnteriores: [], // provas anteriores do mesmo nº de lote (repescagem, 16/10/2026)
     criadoEm: new Date().toISOString(),
     atualizadoEm: new Date().toISOString()
   };
@@ -1591,7 +1588,8 @@ function renderTabelaLAB(){
   // 22/09/2026: a caixa de seleção + o botão "Copiar" ficaram só na coluna Concluídos (a pedido da
   // Joana) — em Planeados/WIP não fazem sentido, porque esses lotes ainda não têm nada para "enviar
   // ao LAB". A mini-tabela TCA/MOFO/OUTROS também continua só em Concluídos.
-  renderColunaLAB('labColPlaneados', 'labContPlaneados', todos.filter(l=> grupoLoteLAB(l)==='planeados'), false, false);
+  // 19/10/2026, a pedido da Joana: a coluna "Planeados" foi retirada do ecrã LAB (os lotes por abrir continuam
+  // visíveis na grelha de Lotes); grupoLoteLAB() continua a classificá-los como 'planeados' para as contagens.
   renderColunaLAB('labColWip', 'labContWip', todos.filter(l=> grupoLoteLAB(l)==='wip'), false, false);
   renderColunaLAB('labColConcluidos', 'labContConcluidos', todos.filter(l=> grupoLoteLAB(l)==='concluidos'), true, true);
   if(historicoLABAberto) renderTabelaHistoricoLAB();
@@ -1655,6 +1653,11 @@ function toggleHistoricoLAB(){
 }
 function linhasHistoricoLAB(){
   const lotes = todosLotes().filter(l=> grupoLoteLAB(l)==='historico');
+  // provas anteriores arquivadas por repescagem (mesmo nº de lote que voltou a entrar) — cada uma
+  // aparece como uma linha própria do histórico, com a sua data e resultado originais.
+  todosLotes().forEach(l=> (l.rondasAnteriores||[]).forEach(r=>{
+    if(r && r.decisao && r.decisao.final) lotes.push(Object.assign({}, r, { numeroLote: l.numeroLote }));
+  }));
   lotes.sort((a,b)=> (b.decisao.data||'').localeCompare(a.decisao.data||''));
   return lotes;
 }
@@ -2087,8 +2090,37 @@ function abrirLoteExistente(num){
     state.lotes[num].diaPrevisto = hojeStr();
     saveState();
     renderAll(); // a grelha "Lotes de hoje" já mostra o lote novo assim que se fechar a ficha
+  } else if(loteElegivelParaRepescagem(state.lotes[num])){
+    // 16/10/2026, a pedido da Joana: um lote já concluído (ex.: rejeitado) pode voltar a entrar em
+    // amostra, mais tarde, com o MESMO nº de lote — o provador lê-o na etiqueta como qualquer outro.
+    const d = state.lotes[num].decisao.data;
+    if(confirm(`O lote ${num} já foi concluído em ${formatarDataBR(d)}.\n\nVoltou a entrar em amostra? OK = iniciar uma NOVA prova (a anterior fica guardada no histórico). Cancelar = só consultar o lote.`)){
+      reabrirLoteRepescagem(num);
+    }
   }
   openLoteDetail(num);
+}
+/* Repescagem (16/10/2026): um lote concluído em dias anteriores que volta a ser lido. Só se oferece
+   quando foi fechado noutro dia (decisao.data != hoje) — assim, ler outra vez a etiqueta de um lote
+   fechado hoje nunca reabre nada por engano. */
+function loteElegivelParaRepescagem(l){
+  return !!(l && l.decisao && l.decisao.final && l.decisao.data && l.decisao.data !== hojeStr());
+}
+function reabrirLoteRepescagem(num){
+  const antigo = state.lotes[num];
+  if(!loteElegivelParaRepescagem(antigo)) return false;
+  const snap = JSON.parse(JSON.stringify(antigo));
+  const anteriores = snap.rondasAnteriores || [];
+  delete snap.rondasAnteriores;
+  snap.arquivadoEm = new Date().toISOString();
+  const novo = criarLoteVazio(num);
+  novo.previstoHoje = true;
+  novo.diaPrevisto = hojeStr();
+  novo.rondasAnteriores = anteriores.concat([snap]);
+  state.lotes[num] = novo;
+  saveState();
+  renderAll();
+  return true;
 }
 document.getElementById('searchLote').addEventListener('keydown', (e)=>{
   if(e.key==='Enter'){ e.preventDefault(); identificarLoteViaSearch(); }
