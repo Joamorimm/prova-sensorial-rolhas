@@ -1193,6 +1193,29 @@ function analiseCoincidenciaP1P2(lote){
   });
   return { tca, mofo, outros, temDiscordanteForte };
 }
+/* Contagem com 3 provadores (14/10/2026, caso real LT02386406; alargada à DECISÃO a 21/10/2026): só contam
+   os frascos marcados por PELO MENOS 2 dos 3 provadores — quaisquer 2, independentemente de quais —
+   e cada um conta pelo composto MAIS FORTE assinalado por quem o marcou (hierarquia TCA > Mofo > Outro).
+   Um frasco marcado por um só provador continua a aparecer na tabela "Frascos com Aroma", mas não conta.
+   É a mesma contagem para o resumo do LAB e para a decisão automática depois do Provador 3. */
+function tallyDoisDeTres(lote){
+  const porFrasco = {};
+  ['p1','p2','p3'].forEach(p=>{
+    (lote.registos[p].itens||[]).forEach(it=>{
+      const t = tipoFrasco(it);
+      if(!t) return;
+      (porFrasco[it.frasco] = porFrasco[it.frasco]||[]).push(t);
+    });
+  });
+  let tca=0, mofo=0, outros=0;
+  Object.keys(porFrasco).forEach(n=>{
+    const tipos = porFrasco[n];
+    if(tipos.length < 2) return; // só um provador marcou — não conta
+    const tipo = combinarTipo(tipos);
+    if(tipo==='tca') tca++; else if(tipo==='mofo') mofo++; else if(tipo==='outro') outros++;
+  });
+  return { tca, mofo, outros };
+}
 /* 25/09/2026: a pedido da Joana — a mini-tabela TCA/MOFO/OUTROS mostrada ao LAB (coluna Concluídos)
    tem de contar só os frascos COINCIDENTES entre os provadores, exatamente a mesma regra que decide
    se o lote tem frascos para levantar — não a união de tudo o que qualquer um marcou. Ex.: um frasco
@@ -1202,27 +1225,7 @@ function analiseCoincidenciaP1P2(lote){
    caso conta-se a união dos três, que é a própria decisão final (ver tentarAutoFinalizar). */
 function tallyResumoLAB(lote){
   if(lote.registos.p3 && lote.registos.p3.concluido){
-    // 14/10/2026, a pedido da Joana (caso real com 3 provadores: a tabela mostrava 7/4/3 = união de
-    // todos os frascos, quando o correto era 5/4/1): com 3 provadores, só contam os frascos marcados
-    // por PELO MENOS 2 dos 3 provadores (em comum), e cada um conta pelo composto MAIS FORTE
-    // assinalado por qualquer dos que o marcaram (hierarquia TCA > Mofo > Outro). Um frasco marcado
-    // por um só provador continua a aparecer na tabela "Frascos com Aroma", mas não entra nesta contagem.
-    const porFrasco = {};
-    ['p1','p2','p3'].forEach(p=>{
-      (lote.registos[p].itens||[]).forEach(it=>{
-        const t = tipoFrasco(it);
-        if(!t) return;
-        (porFrasco[it.frasco] = porFrasco[it.frasco]||[]).push(t);
-      });
-    });
-    let tca=0, mofo=0, outros=0;
-    Object.keys(porFrasco).forEach(n=>{
-      const tipos = porFrasco[n];
-      if(tipos.length < 2) return; // só um provador marcou — não conta
-      const tipo = combinarTipo(tipos);
-      if(tipo==='tca') tca++; else if(tipo==='mofo') mofo++; else if(tipo==='outro') outros++;
-    });
-    return { tca, mofo, outros };
+    return tallyDoisDeTres(lote);
   }
   const analise = analiseCoincidenciaP1P2(lote);
   return { tca: analise.tca, mofo: analise.mofo, outros: analise.outros };
@@ -1270,7 +1273,13 @@ function textoFrascosLoteCsv(lote){
    assim que o Provador 3 assina, a informação termina ali — o total (agora com P1+P2+P3) decide
    sozinho e direto, sem mais nenhum passo, e já vai para o Levantamento se for caso disso. */
 function precisaDeProvador3(lote){
-  return analiseCoincidenciaP1P2(lote).temDiscordanteForte;
+  const a = analiseCoincidenciaP1P2(lote);
+  // 21/10/2026, a pedido da Joana (caso real LT02386406, frasco 7 — Mofo Forte só do Provador 2): o 3º
+  // provador só é chamado quando a discordância Forte PODE mudar o resultado. Se os frascos em comum
+  // entre P1 e P2 já chegam ao limiar (3+ TCA ou 4+ Mofo), o lote já tem frascos para levantar e nada
+  // do que o Provador 3 disser (TCA ou Mofo, o mesmo vale para os dois) altera isso — não se chama.
+  if(a.tca>=3 || a.mofo>=4) return false;
+  return a.temDiscordanteForte;
 }
 /* União (sem nada por decidir) — sem necessidade de 3º provador, ou já assinado pelo Provador 3 */
 function uniaoResolvida(lote){
@@ -1306,14 +1315,17 @@ function tentarAutoFinalizar(numero){
   if(!uniaoResolvida(lote)) return false;
   if(lote.registos.p3.concluido){
     // "A informação termina com a decisão do Provador 3" — regra direta: há defeito ou não há
-    // (aqui mantém-se a contagem por união P1+P2+P3, sem exigir coincidência — o 3º provador é
-    // precisamente quem desempata um frasco discordante Forte).
-    const det = uniaoTallyDetalhada(lote);
-    if(det.contaveis===0){
-      finalizarAutomatico(numero, false, null, 'Sem qualquer frasco com TCA ou Mofo, mesmo depois do Provador 3.');
+    // (a contagem é a regra 2-de-3 abaixo — o 3º provador é quem confirma, ou não, um frasco discordante Forte).
+    // 21/10/2026, a pedido da Joana: "o somatório tem de ser 2 dos 3 aromas independentemente de qual
+    // provador seja" — a decisão usa a mesma contagem do resumo do LAB (tallyDoisDeTres): só frascos
+    // marcados por pelo menos 2 dos 3 provadores, pelo composto mais forte (TCA > Mofo > Outro).
+    const t3 = tallyDoisDeTres(lote);
+    const contaveis3 = t3.tca + t3.mofo;
+    if(contaveis3===0){
+      finalizarAutomatico(numero, false, null, 'Sem qualquer frasco com TCA ou Mofo em comum a 2 dos 3 provadores, depois do Provador 3.');
     } else {
-      const classificacao = det.contaveis>=3 ? 'TCA Forte' : null;
-      finalizarAutomatico(numero, true, classificacao, `${det.contaveis} frasco(s) com TCA/Mofo depois do Provador 3 — segue para o Levantamento.`);
+      const classificacao = t3.tca>=3 ? 'TCA Forte' : null;
+      finalizarAutomatico(numero, true, classificacao, `${t3.tca} frasco(s) com TCA e ${t3.mofo} com Mofo (em comum a 2 dos 3 provadores) depois do Provador 3 — segue para o Levantamento.`);
     }
     return true;
   }
@@ -2104,10 +2116,9 @@ function abrirLoteExistente(num){
   } else if(loteElegivelParaRepescagem(state.lotes[num])){
     // 16/10/2026, a pedido da Joana: um lote já concluído (ex.: rejeitado) pode voltar a entrar em
     // amostra, mais tarde, com o MESMO nº de lote — o provador lê-o na etiqueta como qualquer outro.
-    const d = state.lotes[num].decisao.data;
-    if(confirm(`O lote ${num} já foi concluído em ${formatarDataBR(d)}.\n\nVoltou a entrar em amostra? OK = iniciar uma NOVA prova (a anterior fica guardada no histórico). Cancelar = só consultar o lote.`)){
-      reabrirLoteRepescagem(num);
-    }
+    // 21/10/2026, a pedido da Joana: sem pergunta de confirmação (poka-yoke retirado) — ler um lote
+    // concluído noutro dia abre logo uma prova nova; a anterior fica sempre arquivada no histórico.
+    reabrirLoteRepescagem(num);
   }
   openLoteDetail(num);
 }
